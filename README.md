@@ -6,7 +6,7 @@ An interactive, mobile-first web application for exploring **animals**, **plants
 
 ![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg)
 ![Content: UBS](https://img.shields.io/badge/Content-United%20Bible%20Societies-blue)
-![Built by: TFBF](https://img.shields.io/badge/Built%20by-The%20Free%20Bible%20Foundation-green)
+![Built by: TFBF](https://img.shields.io/badge/Built%20by-TFBF-orange)
 
 ---
 
