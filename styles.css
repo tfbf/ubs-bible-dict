@@ -668,6 +668,36 @@ img { max-width: 100%; display: block; }
   box-shadow: var(--shadow-sm);
 }
 
+.image-caption {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--c-text-secondary);
+}
+
+.image-caption-text {
+  color: var(--c-text);
+}
+
+.image-attribution {
+  color: var(--c-text-muted);
+}
+
+.image-source-link {
+  font-size: 0.74rem;
+  color: var(--c-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  width: fit-content;
+}
+
+.image-source-link:hover {
+  color: var(--c-accent-hover);
+}
+
 /* Language set display in content */
 .lang-set-inline {
   background: var(--c-surface);
