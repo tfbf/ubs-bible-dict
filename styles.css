@@ -415,6 +415,63 @@ img { max-width: 100%; display: block; }
   color: var(--c-text-muted);
   margin-right: 6px;
 }
+.entry-key-strongs {
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+  color: var(--c-accent);
+  background: var(--c-accent-bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-right: 6px;
+  letter-spacing: 0.03em;
+}
+
+/* Lexicon sort bar */
+.lex-sort-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  padding: 6px var(--panel-pad);
+  background: var(--c-bg-secondary);
+  border-bottom: 1px solid var(--c-border-light);
+}
+.lex-sort-btn {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  border-radius: var(--r-sm);
+  background: var(--c-surface);
+  color: var(--c-text-secondary);
+  border: 1px solid var(--c-border-light);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+.lex-sort-btn:hover { background: var(--c-surface-alt); color: var(--c-text); }
+.lex-sort-btn.active {
+  background: var(--c-accent-bg);
+  color: var(--c-accent);
+  border-color: var(--c-accent-light);
+  font-weight: 600;
+}
+
+/* Domain group header in lexicon list */
+.lex-domain-header {
+  padding: 6px var(--panel-pad) 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--c-text-muted);
+  background: var(--c-surface);
+  border-top: 1px solid var(--c-border-light);
+  margin-top: 4px;
+  position: sticky;
+  top: 37px;
+  z-index: 1;
+}
 
 /* Middle panel */
 .panel-middle {
@@ -487,6 +544,160 @@ img { max-width: 100%; display: block; }
 .entry-book-badge.fauna { background: #EFF5E9; color: var(--c-fauna); }
 .entry-book-badge.flora { background: #E8F5F1; color: var(--c-flora); }
 .entry-book-badge.realia { background: #F5EDE5; color: var(--c-realia); }
+.entry-book-badge.greek { background: #EEF2FF; color: #4F46E5; }
+.entry-book-badge.hebrew { background: #FDF4FF; color: #9333EA; }
+
+/* ═══════════════════════════════════════════════════════════════
+   LEXICON ENTRY (Greek / Hebrew)
+   ═══════════════════════════════════════════════════════════════ */
+.lex-lemma {
+  font-family: var(--f-serif);
+  font-size: 1.9rem;
+}
+
+/* Part of speech row */
+.lex-pos-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+.lex-pos-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 2px 10px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--r-full);
+  color: var(--c-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+/* Inflections bar */
+.lex-inflections {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding: 8px 12px;
+  background: var(--c-surface);
+  border-left: 3px solid var(--c-border);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 0.83rem;
+}
+.lex-inflections-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-text-muted);
+  flex-shrink: 0;
+}
+.lex-inflections-val { color: var(--c-text-secondary); }
+.lex-infl-sep { color: var(--c-text-muted); margin: 0 2px; }
+
+/* Sense block */
+.lex-sense {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--c-border-light);
+}
+.lex-sense:last-child { border-bottom: none; margin-bottom: 0; }
+.lex-sense.has-num {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 0 12px;
+}
+.lex-sense-num {
+  grid-row: 1 / span 10;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--c-accent-bg);
+  color: var(--c-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.lex-sense-body { min-width: 0; }
+
+/* Domain chips inside sense */
+.lex-domain-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.lex-domain-chip {
+  display: inline-block;
+  font-size: 0.67rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: var(--c-surface-alt);
+  color: var(--c-text-muted);
+  border: 1px solid var(--c-border-light);
+}
+.lex-chip-sub {
+  background: transparent;
+  color: var(--c-text-muted);
+  border-style: dashed;
+}
+
+/* Glosses — primary meaning, prominent */
+.lex-glosses {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--c-text);
+  margin-bottom: 6px;
+  font-family: var(--f-serif);
+  font-style: italic;
+}
+
+/* Definition */
+.lex-definition {
+  font-size: 0.88rem;
+  color: var(--c-text-secondary);
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+
+/* Collocations */
+.lex-colloc {
+  font-size: 0.82rem;
+  color: var(--c-text-muted);
+  margin-top: 4px;
+}
+.lex-colloc-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c-text-muted);
+  margin-right: 6px;
+}
+
+/* Comments */
+.lex-comment {
+  font-size: 0.82rem;
+  color: var(--c-text-secondary);
+  background: var(--c-surface);
+  border-left: 3px solid var(--c-border);
+  padding: 6px 10px;
+  margin-top: 8px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  line-height: 1.5;
+}
 
 .entry-term-strip {
   margin-bottom: 20px;

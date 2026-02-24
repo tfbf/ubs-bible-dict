@@ -17,6 +17,52 @@ const BOOK_LABELS = { fauna: 'Fauna', flora: 'Flora', realia: 'Realia', greek: '
 const BOOK_ICONS  = { fauna: '🦁', flora: '🌿', realia: '⚒️', greek: 'ΑΩ', hebrew: 'אב' };
 const ENTRY_BOOK_POSITION = { fauna: 0, flora: 1, realia: 2, greek: 3, hebrew: 4 };
 let rightPanelTab = 'details';
+let lexiconSortMode = localStorage.getItem('lexiconSortMode') || 'alpha';
+
+function setLexiconSort(mode) {
+  lexiconSortMode = mode;
+  localStorage.setItem('lexiconSortMode', mode);
+  renderEntryList($navFilter.value);
+}
+
+// Parse <strong>Label:</strong> value paragraphs into a fields map
+function parseSectionFields(paragraphs) {
+  const fields = {};
+  const re = /^<strong>([^<:]+):<\/strong>\s*(.*)/s;
+  for (const p of (paragraphs || [])) {
+    const m = p.match(re);
+    if (!m) continue;
+    const key = m[1].trim();
+    const val = m[2].trim();
+    if (Object.prototype.hasOwnProperty.call(fields, key)) {
+      if (!Array.isArray(fields[key])) fields[key] = [fields[key]];
+      fields[key].push(val);
+    } else {
+      fields[key] = val;
+    }
+  }
+  return fields;
+}
+
+function getPrimaryStrongs(entry) {
+  const ls = (entry.languageSets || [])[0];
+  return ls ? ((ls.strongs || [])[0] || '') : '';
+}
+
+function getLexiconDomainLabel(entry) {
+  // Hebrew: semanticDomains populated directly
+  const doms = entry.semanticDomains;
+  if (doms && doms.length > 0) return doms[0].label || '';
+  // Greek: domain in first sense section paragraphs
+  for (const sec of (entry.sections || [])) {
+    if (sec.contentType === 'sense') {
+      const f = parseSectionFields(sec.paragraphs);
+      const d = f['Domains'];
+      if (d) return Array.isArray(d) ? d[0] : d;
+    }
+  }
+  return '';
+}
 const REF_BOOK_ORDER = [
   'Gen', 'Exod', 'Lev', 'Num', 'Deut', 'Josh', 'Judg', 'Ruth', '1 Sam', '2 Sam',
   '1 Kgs', '2 Kgs', '1 Chr', '2 Chr', 'Ezra', 'Neh', 'Esth', 'Job', 'Ps', 'Prov',
@@ -370,36 +416,81 @@ function switchBook(book) {
 // ── Entry list rendering ──────────────────────────────────────────
 
 function renderEntryList(filter = '') {
-  const entries = DICTIONARY_DATA[currentBook] || [];
+  const allEntries = DICTIONARY_DATA[currentBook] || [];
+  const isLexicon = (currentBook === 'greek' || currentBook === 'hebrew');
   const filterLower = filter.toLowerCase().trim();
 
+  // Filter
+  let entries = allEntries.filter(entry => {
+    if (!filterLower) return true;
+    if (entry.title.toLowerCase().includes(filterLower)) return true;
+    const strongs = getPrimaryStrongs(entry).toLowerCase();
+    if (strongs && strongs.includes(filterLower)) return true;
+    if (isLexicon && getLexiconDomainLabel(entry).toLowerCase().includes(filterLower)) return true;
+    return false;
+  });
+
   let html = '';
-  let count = 0;
 
-  for (const entry of entries) {
-    // Skip if filtered
-    if (filterLower && !entry.title.toLowerCase().includes(filterLower) &&
-        !entry.key.includes(filterLower)) {
-      continue;
+  if (isLexicon) {
+    // Sort controls
+    html += `<div class="lex-sort-bar">`;
+    html += `<button class="lex-sort-btn${lexiconSortMode === 'alpha' ? ' active' : ''}" onclick="setLexiconSort('alpha')" title="Sort alphabetically">A–Z</button>`;
+    html += `<button class="lex-sort-btn${lexiconSortMode === 'strongs' ? ' active' : ''}" onclick="setLexiconSort('strongs')" title="Sort by Strong's number">#</button>`;
+    html += `<button class="lex-sort-btn${lexiconSortMode === 'domain' ? ' active' : ''}" onclick="setLexiconSort('domain')" title="Group by semantic domain">Domain</button>`;
+    html += `</div>`;
+
+    // Sort
+    if (lexiconSortMode === 'strongs') {
+      entries = [...entries].sort((a, b) => {
+        const sa = getPrimaryStrongs(a) || 'Z9999';
+        const sb = getPrimaryStrongs(b) || 'Z9999';
+        return sa.localeCompare(sb);
+      });
+    } else if (lexiconSortMode === 'domain') {
+      entries = [...entries].sort((a, b) => {
+        const da = getLexiconDomainLabel(a) || '\uFFFF';
+        const db = getLexiconDomainLabel(b) || '\uFFFF';
+        if (da !== db) return da.localeCompare(db);
+        return (getPrimaryStrongs(a) || a.title).localeCompare(getPrimaryStrongs(b) || b.title);
+      });
     }
+  }
 
-    count++;
-    const depth = Math.min(entry.depth, 3);
+  let lastDomain = null;
+  for (const entry of entries) {
+    const depth = isLexicon ? 0 : Math.min(entry.depth, 3);
     const active = entry.key === currentEntryKey ? ' active' : '';
-    const keyDisplay = entry.key === '0' ? '' : entry.key;
+
+    // Domain group header
+    if (isLexicon && lexiconSortMode === 'domain') {
+      const dom = getLexiconDomainLabel(entry) || '(Unclassified)';
+      if (dom !== lastDomain) {
+        html += `<div class="lex-domain-header">${escHtml(dom)}</div>`;
+        lastDomain = dom;
+      }
+    }
 
     html += `<button class="entry-item depth-${depth}${active}"
                      data-key="${escHtml(entry.key)}"
                      role="option"
                      onclick="selectEntry('${escJs(entry.key)}')">`;
-    if (keyDisplay) {
-      html += `<span class="entry-key">${escHtml(keyDisplay)}</span>`;
+
+    if (isLexicon) {
+      const strongs = getPrimaryStrongs(entry);
+      if (strongs) {
+        html += `<span class="entry-key entry-key-strongs">${escHtml(strongs)}</span>`;
+      }
+    } else {
+      const keyDisplay = entry.key === '0' ? '' : entry.key;
+      if (keyDisplay) html += `<span class="entry-key">${escHtml(keyDisplay)}</span>`;
     }
+
     html += `${escHtml(entry.title)}</button>`;
   }
 
   $entryList.innerHTML = html;
-  $entryCount.textContent = `${count} entries`;
+  $entryCount.textContent = `${entries.length} entries`;
 }
 
 // ── Entry selection ───────────────────────────────────────────────
@@ -448,9 +539,100 @@ function navigateTo(target) {
   }
 }
 
+// ── Lexicon entry renderer (Greek / Hebrew) ──────────────────────
+
+function renderLexiconEntry(entry) {
+  const baseFormSections = (entry.sections || []).filter(s => s.contentType === 'base-form');
+  const senseSections    = (entry.sections || []).filter(s => s.contentType === 'sense');
+
+  // Collect unique POS labels across all base forms
+  const posLabels = [];
+  for (const bf of baseFormSections) {
+    const f = parseSectionFields(bf.paragraphs);
+    const pos = Array.isArray(f['Part of Speech']) ? f['Part of Speech'][0] : f['Part of Speech'];
+    if (pos && !posLabels.includes(pos)) posLabels.push(pos);
+  }
+
+  let html = '';
+  html += `<div class="entry-title-block">`;
+  html += `<h1><span class="lex-lemma">${escHtml(entry.title)}</span>`;
+  html += `<span class="entry-book-badge ${entry.book}">${BOOK_LABELS[entry.book]}</span>`;
+  html += `</h1>`;
+  if (posLabels.length > 0) {
+    html += `<div class="lex-pos-row">`;
+    for (const pos of posLabels) {
+      html += `<span class="lex-pos-badge">${escHtml(pos)}</span>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  // Inflections — collect from all base forms, deduplicate
+  const inflections = [];
+  for (const bf of baseFormSections) {
+    const f = parseSectionFields(bf.paragraphs);
+    const infl = Array.isArray(f['Inflections']) ? f['Inflections'][0] : f['Inflections'];
+    if (infl && !inflections.includes(infl)) inflections.push(infl);
+  }
+  if (inflections.length > 0) {
+    html += `<div class="lex-inflections">`;
+    html += `<span class="lex-inflections-label">Inflections</span>`;
+    const renderedInfls = inflections.map(infl => {
+      return infl.split('|').map(s => s.trim()).filter(Boolean)
+        .map(s => `<span>${escHtml(s)}</span>`).join(' <span class="lex-infl-sep">·</span> ');
+    }).join('; ');
+    html += `<span class="lex-inflections-val">${renderedInfls}</span>`;
+    html += `</div>`;
+  }
+
+  // Senses
+  const hasMultipleSenses = senseSections.length > 1;
+  for (let si = 0; si < senseSections.length; si++) {
+    const f = parseSectionFields(senseSections[si].paragraphs);
+
+    const domStr  = Array.isArray(f['Domains'])     ? f['Domains'][0]     : (f['Domains'] || '');
+    const subStr  = Array.isArray(f['Subdomains'])  ? f['Subdomains'][0]  : (f['Subdomains'] || '');
+    const coreStr = Array.isArray(f['Core Domains'])? f['Core Domains'][0]: (f['Core Domains'] || '');
+    const domLabel = domStr || coreStr || '';
+
+    const glossStr   = Array.isArray(f['Glosses'])     ? f['Glosses'].join('; ')     : (f['Glosses'] || '');
+    const defStr     = Array.isArray(f['Definition'])  ? f['Definition'].join(' ')   : (f['Definition'] || '');
+    const collocStr  = Array.isArray(f['Collocations'])? f['Collocations'].join('; '): (f['Collocations'] || '');
+    const commentStr = Array.isArray(f['Comments'])    ? f['Comments'].join(' ')     : (f['Comments'] || '');
+
+    html += `<div class="lex-sense${hasMultipleSenses ? ' has-num' : ''}">`;
+    if (hasMultipleSenses) html += `<div class="lex-sense-num">${si + 1}</div>`;
+    html += `<div class="lex-sense-body">`;
+
+    if (domLabel || subStr) {
+      html += `<div class="lex-domain-chips">`;
+      if (domLabel) html += `<span class="lex-domain-chip">${escHtml(domLabel)}</span>`;
+      if (subStr && subStr !== domLabel) html += `<span class="lex-domain-chip lex-chip-sub">${escHtml(subStr)}</span>`;
+      html += `</div>`;
+    }
+
+    if (glossStr) html += `<div class="lex-glosses">${escHtml(glossStr)}</div>`;
+    if (defStr)   html += `<div class="lex-definition">${escHtml(defStr)}</div>`;
+    if (collocStr) html += `<div class="lex-colloc"><span class="lex-colloc-label">Collocations</span>${escHtml(collocStr)}</div>`;
+    if (commentStr) html += `<div class="lex-comment">${commentStr}</div>`;
+
+    html += `</div></div>`; // lex-sense-body, lex-sense
+  }
+
+  $entryContent.innerHTML = html;
+  $middlePanel.scrollTop = 0;
+  document.title = `${entry.title} — ${BOOK_LABELS[entry.book]} — Bible Reference`;
+}
+
 // ── Entry content rendering ───────────────────────────────────────
 
 function renderEntry(entry, options = {}) {
+  // Dedicated renderer for Greek/Hebrew lexicons
+  if (entry.book === 'greek' || entry.book === 'hebrew') {
+    renderLexiconEntry(entry);
+    return;
+  }
+
   const resetScroll = options.resetScroll !== false;
   let html = '';
 
@@ -1020,16 +1202,20 @@ function renderRightDetails(entry) {
     html += `</div>`;
   }
 
-  const entryStrongs = collectEntryStrongs(entry);
-  if (entryStrongs.length > 0) {
-    html += `<div class="right-section">`;
-    html += `<div class="right-section-title">Strong's Links (${entryStrongs.length})</div>`;
-    html += `<div class="right-strongs-list">`;
-    for (const strongsId of entryStrongs) {
-      const id = escHtml(strongsId);
-      html += `<a class="right-strongs-item" href="${strongsBibleHubUrl(strongsId)}" target="_blank" rel="noopener">BibleHub ${id}</a>`;
+  // For lexicon books Strong's already shown inline in languageSet card above — skip duplicate section
+  const isLexiconEntry = (entry.book === 'greek' || entry.book === 'hebrew');
+  if (!isLexiconEntry) {
+    const entryStrongs = collectEntryStrongs(entry);
+    if (entryStrongs.length > 0) {
+      html += `<div class="right-section">`;
+      html += `<div class="right-section-title">Strong's Links (${entryStrongs.length})</div>`;
+      html += `<div class="right-strongs-list">`;
+      for (const strongsId of entryStrongs) {
+        const id = escHtml(strongsId);
+        html += `<a class="right-strongs-item" href="${strongsBibleHubUrl(strongsId)}" target="_blank" rel="noopener">BibleHub ${id}</a>`;
+      }
+      html += `</div></div>`;
     }
-    html += `</div></div>`;
   }
 
   if (entry.references && entry.references.length > 0) {
