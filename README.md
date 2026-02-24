@@ -2,7 +2,7 @@
 
 An interactive, mobile-first web application for exploring **animals**, **plants**, and **material objects** mentioned in the Bible. Built from the [UBS Open License](https://github.com/ubsicap/ubs-open-license/tree/main/flora-fauna-realia) thematic lexicon data.
 
-> **Live at:** [tfbf.in](https://tfbf.in)
+> **Live at:** [UBS Bible Dictionaries](https://ubs-bible-dictionaries.vercel.app/)
 
 ![License: CC BY-SA 4.0](https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg)
 ![Content: UBS](https://img.shields.io/badge/Content-United%20Bible%20Societies-blue)
