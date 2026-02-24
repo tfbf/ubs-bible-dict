@@ -653,6 +653,21 @@ img { max-width: 100%; display: block; }
   font-style: italic;
 }
 
+.inline-image {
+  margin: 12px 0;
+  max-width: 520px;
+}
+
+.entry-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--c-border-light);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-sm);
+}
+
 /* Language set display in content */
 .lang-set-inline {
   background: var(--c-surface);
