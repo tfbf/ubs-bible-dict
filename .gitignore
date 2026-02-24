@@ -1,4 +1,4 @@
 images/*.zip
 
 data.js
-data-*.js
+# data-*.js
