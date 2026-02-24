@@ -708,6 +708,21 @@ function renderLexiconEntry(entry) {
   $entryContent.querySelectorAll('.cross-ref').forEach(el => {
     el.addEventListener('click', () => navigateTo(el.dataset.target));
   });
+
+  // Attach click handlers for scripture refs generated from {S:...} codes
+  $entryContent.querySelectorAll('.scripture-ref').forEach(el => {
+    el.addEventListener('click', () => {
+      const reference = (el.dataset.reference || el.textContent || '').trim();
+      if (!reference) return;
+      performReferenceLookup(reference);
+      rightPanelTab = 'lookup';
+      const liveEntry = entryMap[`${currentBook}:${currentEntryKey}`];
+      if (liveEntry) {
+        renderRightPanel(liveEntry);
+      }
+      fetchLookupVerseText(reference);
+    });
+  });
 }
 
 // ── Entry content rendering ───────────────────────────────────────

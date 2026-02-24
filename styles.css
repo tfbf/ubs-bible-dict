@@ -983,7 +983,9 @@ input:checked + .toggle-slider:before { transform: translateX(12px); }
   padding: 1px 6px;
   border-radius: 3px;
   white-space: nowrap;
+  cursor: pointer;
 }
+.scripture-ref:hover { text-decoration: underline; }
 .bible-version {
   font-variant: small-caps;
   font-weight: 600;
