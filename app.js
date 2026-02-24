@@ -20,6 +20,15 @@ let rightPanelTab = 'details';
 let lexiconSortMode = localStorage.getItem('lexiconSortMode') || 'alpha';
 let accordionMode = localStorage.getItem('accordionMode') === 'true';
 let openDomains = new Set(JSON.parse(localStorage.getItem('openDomains') || '[]'));
+const entryBackStack = [];
+
+let $entryBackBtn = null;
+let $crossRefModal = null;
+let $crossRefModalDialog = null;
+let $crossRefModalTitle = null;
+let $crossRefModalMeta = null;
+let $crossRefModalBody = null;
+let $crossRefModalOpenBtn = null;
 
 // ── DOM references ────────────────────────────────────────────────
 const $landing       = document.getElementById('landing');
@@ -378,24 +387,32 @@ registerBook('realia', typeof DICTIONARY_DATA_REALIA !== 'undefined' ? DICTIONAR
 
 // ── View switching ────────────────────────────────────────────────
 
-function showLanding() {
+function showLanding(pushHistory = true) {
   $app.classList.remove('active');
   $landing.classList.add('active');
   document.title = 'Bible Flora, Fauna & Realia — A Digital Reference';
-  history.pushState(null, '', '#');
+  if (pushHistory) {
+    history.pushState(null, '', '#');
+  }
 }
 
 function launchApp(book) {
   $landing.classList.remove('active');
   $app.classList.add('active');
-  switchBook(book);
+  switchBook(book, { recordBack: false, pushHistory: false });
 }
 
 // ── Book switching ────────────────────────────────────────────────
 
-function switchBook(book) {
+function switchBook(book, options = {}) {
+  const { recordBack = true, initialKey = null, pushHistory = true } = options;
+  if (recordBack && currentEntryKey !== null && book !== currentBook) {
+    pushEntryHistory(currentBook, currentEntryKey);
+  }
+
   currentBook = book;
   currentEntryKey = null;
+  updateEntryBackButton();
 
   const isLexicon = (book === 'greek' || book === 'hebrew');
   if ($lexSortBar) {
@@ -430,7 +447,10 @@ function switchBook(book) {
       if (currentBook !== book) return; // user navigated away
       renderEntryList();
       const entries = DICTIONARY_DATA[book];
-      if (entries && entries.length > 0) selectEntry(entries[0].key);
+      if (entries && entries.length > 0) {
+        const targetKey = initialKey && entries.some(e => e.key === initialKey) ? initialKey : entries[0].key;
+        selectEntry(targetKey, { pushHistory });
+      }
       updateHash();
     }).catch(err => {
       if (currentBook !== book) return;
@@ -449,7 +469,8 @@ function switchBook(book) {
   // Auto-select the first entry — the "0" (contents) entry
   const entries = DICTIONARY_DATA[book];
   if (entries && entries.length > 0) {
-    selectEntry(entries[0].key);
+    const targetKey = initialKey && entries.some(e => e.key === initialKey) ? initialKey : entries[0].key;
+    selectEntry(targetKey, { pushHistory });
   }
 
   updateHash();
@@ -547,7 +568,12 @@ function renderEntryList(filter = '') {
 
 // ── Entry selection ───────────────────────────────────────────────
 
-function selectEntry(key) {
+function selectEntry(key, options = {}) {
+  const { pushHistory = true } = options;
+  if (pushHistory && currentEntryKey !== null && currentEntryKey !== key) {
+    pushEntryHistory(currentBook, currentEntryKey);
+  }
+
   currentEntryKey = key;
   const entry = entryMap[`${currentBook}:${key}`];
   if (!entry) return;
@@ -566,12 +592,39 @@ function selectEntry(key) {
   renderEntry(entry);
   renderRightPanel(entry);
   updateHash();
+  updateEntryBackButton();
 
   // On mobile, show middle panel
   if (window.innerWidth <= 768) {
     showMobilePanel('middle');
     closeMobileNav();
   }
+}
+
+function pushEntryHistory(book, key) {
+  if (!book || key === null || key === undefined || key === '') return;
+  const last = entryBackStack[entryBackStack.length - 1];
+  if (last && last.book === book && last.key === key) return;
+  entryBackStack.push({ book, key });
+  if (entryBackStack.length > 250) {
+    entryBackStack.shift();
+  }
+}
+
+function goBackEntry() {
+  if (entryBackStack.length === 0) return;
+  const previous = entryBackStack.pop();
+  if (!previous) return;
+  switchBook(previous.book, {
+    recordBack: false,
+    initialKey: previous.key,
+    pushHistory: false,
+  });
+}
+
+function updateEntryBackButton() {
+  if (!$entryBackBtn) return;
+  $entryBackBtn.disabled = entryBackStack.length === 0;
 }
 
 // Navigate to a cross-reference (possibly in another book)
@@ -603,6 +656,339 @@ function navigateTo(target) {
       if (book !== currentBook) switchBook(book);
       doNav();
     }
+  }
+}
+
+async function resolveEntryFromTarget(target) {
+  const match = (target || '').match(/^(FAUNA|FLORA|REALIA|GREEK|HEBREW):(.+)$/i);
+  if (!match) return null;
+
+  const book = match[1].toLowerCase();
+  const rest = match[2];
+
+  if (_bookLoadState[book] !== 'loaded') {
+    await loadBookData(book);
+  }
+
+  if (rest.startsWith('lemma:')) {
+    const lemma = rest.slice(6);
+    const normalized = normalizeTermForIndex(lemma);
+    const langKey = `${book}|${normalized}`;
+    const hits = lemmaIndex[langKey] || lemmaIndex[`*|${normalized}`] || [];
+    const hit = hits.find(h => h.book === book) || hits[0];
+    if (!hit) return null;
+    return entryMap[`${hit.book}:${hit.key}`] || null;
+  }
+
+  return entryMap[`${book}:${rest}`] || null;
+}
+
+function ensureCrossRefModal() {
+  if ($crossRefModal) return;
+
+  const modal = document.createElement('div');
+  modal.className = 'xref-modal';
+  modal.innerHTML = `
+    <div class="xref-modal-backdrop" data-close-modal="1"></div>
+    <div class="xref-modal-dialog" role="dialog" aria-modal="true" aria-label="Cross reference preview">
+      <div class="xref-modal-header">
+        <div class="xref-modal-title-wrap">
+          <div class="xref-modal-title"></div>
+          <div class="xref-modal-meta"></div>
+        </div>
+        <div class="xref-modal-actions">
+          <button class="xref-modal-open" type="button">Open Entry</button>
+          <button class="btn-icon xref-modal-close" type="button" aria-label="Close preview">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="xref-modal-body"></div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  $crossRefModal = modal;
+  $crossRefModalDialog = modal.querySelector('.xref-modal-dialog');
+  $crossRefModalTitle = modal.querySelector('.xref-modal-title');
+  $crossRefModalMeta = modal.querySelector('.xref-modal-meta');
+  $crossRefModalBody = modal.querySelector('.xref-modal-body');
+  $crossRefModalOpenBtn = modal.querySelector('.xref-modal-open');
+
+  modal.querySelectorAll('[data-close-modal], .xref-modal-close').forEach(el => {
+    el.addEventListener('click', () => closeCrossRefModal());
+  });
+
+  $crossRefModalOpenBtn.addEventListener('click', () => {
+    const target = $crossRefModalOpenBtn.dataset.target || '';
+    if (!target) return;
+    closeCrossRefModal();
+    navigateTo(target);
+  });
+}
+
+function isCrossRefModalVisible() {
+  return !!($crossRefModal && $crossRefModal.classList.contains('visible'));
+}
+
+function closeCrossRefModal() {
+  if (!$crossRefModal) return;
+  $crossRefModal.classList.remove('visible');
+}
+
+function buildCrossRefPreview(entry) {
+  if (!entry) return '<p class="entry-paragraph">Entry unavailable.</p>';
+
+  if (entry.book === 'greek' || entry.book === 'hebrew') {
+    const baseFormSections = (entry.sections || []).filter(s => s.contentType === 'base-form');
+    const senseSections = (entry.sections || []).filter(s => s.contentType === 'sense');
+
+    const posLabels = [];
+    for (const bf of baseFormSections) {
+      const f = parseSectionFields(bf.paragraphs);
+      const pos = Array.isArray(f['Part of Speech']) ? f['Part of Speech'][0] : f['Part of Speech'];
+      if (pos && !posLabels.includes(pos)) posLabels.push(pos);
+    }
+
+    const inflections = [];
+    for (const bf of baseFormSections) {
+      const f = parseSectionFields(bf.paragraphs);
+      const infl = Array.isArray(f['Inflections']) ? f['Inflections'][0] : f['Inflections'];
+      if (infl && !inflections.includes(infl)) inflections.push(infl);
+    }
+
+    let translit = '';
+    const firstLs = (entry.languageSets || [])[0];
+    if (firstLs && firstLs.transliteration) {
+      translit = firstLs.transliteration;
+    }
+
+    let html = '';
+    html += `<div class="lex-entry-header">`;
+    html += `<div class="lex-title-row">`;
+    html += `<h1><span class="lex-lemma">${escHtml(entry.title)}</span>`;
+    if (translit) {
+      html += `<span class="lex-translit">${escHtml(translit)}</span>`;
+    }
+    html += `<span class="entry-book-badge ${entry.book}">${BOOK_LABELS[entry.book]}</span>`;
+    html += `</h1>`;
+    html += `</div>`;
+
+    if (posLabels.length > 0) {
+      html += `<div class="lex-pos-row">`;
+      for (const pos of posLabels) {
+        html += `<span class="lex-pos-badge">${escHtml(pos)}</span>`;
+      }
+      html += `</div>`;
+    }
+
+    if (inflections.length > 0) {
+      html += `<div class="lex-inflections">`;
+      html += `<span class="lex-inflections-label">Inflections</span>`;
+      const renderedInfls = inflections.map(infl => {
+        return infl.split('|').map(s => s.trim()).filter(Boolean)
+          .map(s => `<span>${escHtml(s)}</span>`).join(' <span class="lex-infl-sep">·</span> ');
+      }).join('; ');
+      html += `<span class="lex-inflections-val">${renderedInfls}</span>`;
+      html += `</div>`;
+    }
+    html += `</div>`;
+
+    const hasMultipleSenses = senseSections.length > 1;
+    for (let si = 0; si < senseSections.length; si++) {
+      const f = parseSectionFields(senseSections[si].paragraphs);
+
+      const domStr = Array.isArray(f['Domains']) ? f['Domains'][0] : (f['Domains'] || '');
+      const subStr = Array.isArray(f['Subdomains']) ? f['Subdomains'][0] : (f['Subdomains'] || '');
+      const coreStr = Array.isArray(f['Core Domains']) ? f['Core Domains'][0] : (f['Core Domains'] || '');
+      const domLabel = domStr || coreStr || '';
+
+      const glossStr = Array.isArray(f['Glosses']) ? f['Glosses'].join('; ') : (f['Glosses'] || '');
+      const defStr = Array.isArray(f['Definition']) ? f['Definition'].join(' ') : (f['Definition'] || '');
+      const collocStr = Array.isArray(f['Collocations']) ? f['Collocations'].join('; ') : (f['Collocations'] || '');
+      const commentStr = Array.isArray(f['Comments']) ? f['Comments'].join(' ') : (f['Comments'] || '');
+
+      html += `<div class="lex-sense${hasMultipleSenses ? ' has-num' : ''}">`;
+      if (hasMultipleSenses) html += `<div class="lex-sense-num">${si + 1}</div>`;
+      html += `<div class="lex-sense-body">`;
+
+      if (domLabel || subStr) {
+        html += `<div class="lex-domain-chips">`;
+        if (domLabel) html += `<span class="lex-domain-chip">${domLabel}</span>`;
+        if (subStr && subStr !== domLabel) html += `<span class="lex-domain-chip lex-chip-sub">${subStr}</span>`;
+        html += `</div>`;
+      }
+
+      if (glossStr) html += `<div class="lex-glosses">${glossStr}</div>`;
+      if (defStr) html += `<div class="lex-definition">${defStr}</div>`;
+      if (collocStr) html += `<div class="lex-colloc"><span class="lex-colloc-label">Collocations</span>${collocStr}</div>`;
+      if (commentStr) html += `<div class="lex-comment">${commentStr}</div>`;
+
+      html += `</div></div>`;
+    }
+
+    return `<div class="entry-content xref-entry-content">${html}</div>`;
+  }
+
+  let html = '';
+  const visibleSections = (entry.sections || []).filter(sec => !isReferencesSection(sec));
+  const compactTerms = buildCompactTerms(entry.languageSets || []);
+
+  html += `<div class="entry-title-block">`;
+  html += `<h1>${escHtml(entry.title)}`;
+  html += `<span class="entry-book-badge ${entry.book}">${BOOK_LABELS[entry.book]}</span>`;
+  html += `</h1>`;
+  if (entry.key !== '0') {
+    html += `<div class="entry-breadcrumb">${escHtml(entry.book.toUpperCase())} § ${escHtml(entry.key)}</div>`;
+  }
+  html += `</div>`;
+
+  if (compactTerms.length > 0 && ['fauna', 'flora', 'realia'].includes(entry.book)) {
+    html += `<div class="entry-term-strip">`;
+    html += `<div class="entry-term-strip-head">`;
+    html += `<div class="entry-term-strip-label">Source Terms</div>`;
+    html += `<div class="entry-term-control">`;
+    html += `<span class="entry-term-control-text">Script</span>`;
+    html += `<select class="entry-term-select" aria-label="Source term script mode">`;
+    html += `<option value="original"${sourceTermMode === 'original' ? ' selected' : ''}>Original</option>`;
+    html += `<option value="translit"${sourceTermMode === 'translit' ? ' selected' : ''}>Translit</option>`;
+    html += `<option value="both"${sourceTermMode === 'both' ? ' selected' : ''}>Both</option>`;
+    html += `</select>`;
+    html += `</div></div>`;
+    for (const group of compactTerms) {
+      html += `<div class="entry-term-group">`;
+      html += `<span class="entry-term-lang">${escHtml(group.language)}</span>`;
+      for (const item of group.items) {
+        const lemma = (item.lemma || '').trim();
+        const translitItem = (item.transliteration || '').trim();
+
+        if (sourceTermMode === 'both' && lemma && translitItem && normalizeTermForIndex(lemma) !== normalizeTermForIndex(translitItem)) {
+          html += `<button class="entry-term-chip" data-language="${escHtml(group.language)}" data-lemma="${escHtml(lemma)}" data-translit="${escHtml(translitItem)}" data-prefer="lemma" title="Open related entry">${escHtml(lemma)}</button>`;
+          html += `<button class="entry-term-chip is-translit" data-language="${escHtml(group.language)}" data-lemma="${escHtml(lemma)}" data-translit="${escHtml(translitItem)}" data-prefer="translit" title="Open related entry">${escHtml(translitItem)}</button>`;
+          continue;
+        }
+
+        const label = getSourceTermLabel(item, sourceTermMode);
+        if (!label) continue;
+        const prefer = sourceTermMode === 'translit' ? 'translit' : 'lemma';
+        const translitClass = sourceTermMode === 'translit' ? ' is-translit' : '';
+        html += `<button class="entry-term-chip${translitClass}" data-language="${escHtml(group.language)}" data-lemma="${escHtml(lemma)}" data-translit="${escHtml(translitItem)}" data-prefer="${prefer}" title="Open related entry">${escHtml(label)}</button>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (entry.indexItems && entry.indexItems.length > 0) {
+    html += `<div class="entry-index">`;
+    html += `<div class="entry-index-title">Contents</div>`;
+    html += `<ul>`;
+    for (const item of entry.indexItems) {
+      html += `<li><a class="cross-ref" data-target="${escHtml(item.target)}">${item.label}</a></li>`;
+    }
+    html += `</ul></div>`;
+  }
+
+  for (const sec of visibleSections) {
+    html += `<div class="entry-section">`;
+    if (sec.headingHtml) {
+      html += `<div class="section-heading">${sec.headingHtml}</div>`;
+    }
+    if (sec.subheading) {
+      html += `<p class="entry-paragraph"><em>${escHtml(sec.subheading)}</em></p>`;
+    }
+    if (sec.languageSets && sec.languageSets.length > 0) {
+      for (const ls of sec.languageSets) {
+        html += `<div class="lang-set-inline">`;
+        html += `<span class="lang-label">${escHtml(ls.language)}</span>`;
+        html += `<span class="lang-lemma">${escHtml(ls.lemma)}</span>`;
+        if (ls.transliteration) {
+          html += ` <span class="lang-translit">(${escHtml(ls.transliteration)})</span>`;
+        }
+        html += `</div>`;
+      }
+    }
+    for (const p of sec.paragraphs) {
+      html += `<p class="entry-paragraph">${p}</p>`;
+    }
+    html += `</div>`;
+  }
+
+  return `<div class="entry-content xref-entry-content">${html}</div>`;
+}
+
+async function openCrossRefModal(target) {
+  ensureCrossRefModal();
+  $crossRefModal.classList.add('visible');
+  $crossRefModalTitle.textContent = 'Loading…';
+  $crossRefModalMeta.textContent = '';
+  $crossRefModalBody.innerHTML = '<div class="xref-modal-loading">Loading cross-reference…</div>';
+  $crossRefModalOpenBtn.disabled = true;
+  $crossRefModalOpenBtn.dataset.target = '';
+
+  try {
+    const entry = await resolveEntryFromTarget(target);
+    if (!entry) {
+      $crossRefModalTitle.textContent = 'Entry not found';
+      $crossRefModalMeta.textContent = '';
+      $crossRefModalBody.innerHTML = '<p class="entry-paragraph">The referenced entry could not be resolved.</p>';
+      return;
+    }
+
+    $crossRefModalTitle.textContent = entry.title;
+    $crossRefModalMeta.textContent = `${BOOK_LABELS[entry.book]} · ${entry.key}`;
+    $crossRefModalBody.innerHTML = buildCrossRefPreview(entry);
+    $crossRefModalOpenBtn.disabled = false;
+    $crossRefModalOpenBtn.dataset.target = `${entry.book.toUpperCase()}:${entry.key}`;
+
+    $crossRefModalBody.querySelectorAll('.cross-ref').forEach(el => {
+      el.addEventListener('click', () => openCrossRefModal(el.dataset.target));
+    });
+
+    $crossRefModalBody.querySelectorAll('.entry-term-chip').forEach(el => {
+      el.addEventListener('click', () => {
+        const lemma = el.dataset.lemma || '';
+        const translit = el.dataset.translit || '';
+        const language = el.dataset.language || '';
+        const prefer = el.dataset.prefer || (sourceTermMode === 'translit' ? 'translit' : 'lemma');
+        const primary = prefer === 'translit' ? translit : lemma;
+        const secondary = prefer === 'translit' ? lemma : translit;
+        const target = findLinkedEntryForTerm(primary, language, entry) || findLinkedEntryForTerm(secondary, language, entry);
+        if (!target) return;
+        openCrossRefModal(`${target.book.toUpperCase()}:${target.key}`);
+      });
+    });
+
+    const modeSelect = $crossRefModalBody.querySelector('.entry-term-select');
+    if (modeSelect) {
+      modeSelect.addEventListener('change', () => {
+        const mode = modeSelect.value;
+        if (!SOURCE_TERM_MODES.includes(mode)) return;
+        if (mode !== sourceTermMode) {
+          sourceTermMode = mode;
+          localStorage.setItem('sourceTermMode', sourceTermMode);
+          openCrossRefModal(target);
+        }
+      });
+    }
+
+    $crossRefModalBody.querySelectorAll('.scripture-ref').forEach(el => {
+      el.addEventListener('click', () => {
+        const reference = (el.dataset.reference || el.textContent || '').trim();
+        if (!reference) return;
+        closeCrossRefModal();
+        performReferenceLookup(reference);
+        rightPanelTab = 'lookup';
+        const liveEntry = entryMap[`${currentBook}:${currentEntryKey}`];
+        if (liveEntry) {
+          renderRightPanel(liveEntry);
+        }
+        fetchLookupVerseText(reference);
+      });
+    });
+  } catch (error) {
+    $crossRefModalTitle.textContent = 'Preview unavailable';
+    $crossRefModalMeta.textContent = '';
+    $crossRefModalBody.innerHTML = '<p class="entry-paragraph">Could not load the referenced entry right now.</p>';
   }
 }
 
@@ -706,7 +1092,7 @@ function renderLexiconEntry(entry) {
 
   // Attach click handlers for cross-ref links generated from {L:...} codes
   $entryContent.querySelectorAll('.cross-ref').forEach(el => {
-    el.addEventListener('click', () => navigateTo(el.dataset.target));
+    el.addEventListener('click', () => openCrossRefModal(el.dataset.target));
   });
 
   // Attach click handlers for scripture refs generated from {S:...} codes
@@ -842,7 +1228,7 @@ function renderEntry(entry, options = {}) {
 
   // Attach cross-ref click handlers
   $entryContent.querySelectorAll('.cross-ref').forEach(el => {
-    el.addEventListener('click', () => navigateTo(el.dataset.target));
+    el.addEventListener('click', () => openCrossRefModal(el.dataset.target));
   });
 
   $entryContent.querySelectorAll('.entry-term-chip').forEach(el => {
@@ -1653,13 +2039,10 @@ function showSearchResults(results, query) {
       closeSearchResults();
       $searchInput.value = '';
       if (book !== currentBook) {
-        currentBook = book;
-        document.querySelectorAll('.book-tab').forEach(t => t.classList.toggle('active', t.dataset.book === book));
-        document.querySelectorAll('.mobile-book-btn').forEach(b => b.classList.toggle('active', b.dataset.book === book));
-        $navTitle.textContent = BOOK_LABELS[book];
-        renderEntryList();
+        switchBook(book, { initialKey: key, pushHistory: true });
+      } else {
+        selectEntry(key);
       }
-      selectEntry(key);
     });
   });
 }
@@ -1748,7 +2131,9 @@ document.addEventListener('keydown', (e) => {
 
   // Escape closes search / panels
   if (e.key === 'Escape') {
-    if ($searchResults.classList.contains('visible')) {
+    if (isCrossRefModalVisible()) {
+      closeCrossRefModal();
+    } else if ($searchResults.classList.contains('visible')) {
       closeSearchResults();
       $searchInput.blur();
     } else if ($leftPanel.classList.contains('open')) {
@@ -1764,6 +2149,12 @@ document.addEventListener('keydown', (e) => {
   if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault();
     navigateEntry(e.key === 'ArrowDown' ? 1 : -1);
+  }
+
+  // Alt+Left goes back to previous selected entry
+  if (e.altKey && e.key === 'ArrowLeft') {
+    e.preventDefault();
+    goBackEntry();
   }
 });
 
@@ -1788,7 +2179,7 @@ function updateHash() {
   if (currentEntryKey !== null) {
     const hash = `#${currentBook}/${currentEntryKey}`;
     if (location.hash !== hash) {
-      history.replaceState(null, '', hash);
+      history.pushState(null, '', hash);
     }
   }
 }
@@ -1804,18 +2195,11 @@ function handleHash() {
     if (book in BOOK_LABELS) {
       $landing.classList.remove('active');
       $app.classList.add('active');
-      // For lazy books, load then select
-      if (_bookLoadState[book] !== 'loaded') {
-        switchBook(book); // shows loading spinner
-        loadBookData(book).then(() => {
-          if (currentBook !== book) return;
-          renderEntryList();
-          selectEntry(key);
-        });
-      } else {
-        launchApp(book);
-        selectEntry(key);
-      }
+      switchBook(book, {
+        recordBack: false,
+        initialKey: key,
+        pushHistory: false,
+      });
       return true;
     }
   }
@@ -1860,11 +2244,36 @@ function injectMobileBookSelector() {
   panelHeader.after(selectorDiv);
 }
 
+function injectEntryBackButton() {
+  const header = document.querySelector('.app-header');
+  const homeBtn = header?.querySelector('.header-home');
+  if (!header || !homeBtn) return;
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'btn-icon header-back';
+  backBtn.type = 'button';
+  backBtn.title = 'Back to previous entry (Alt+Left)';
+  backBtn.setAttribute('aria-label', 'Back to previous entry');
+  backBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+  backBtn.addEventListener('click', () => goBackEntry());
+
+  homeBtn.insertAdjacentElement('afterend', backBtn);
+  $entryBackBtn = backBtn;
+  updateEntryBackButton();
+}
+
 
 // ── Initialize ────────────────────────────────────────────────────
 
 function init() {
+  injectEntryBackButton();
   injectMobileBookSelector();
+
+  window.addEventListener('popstate', () => {
+    if (!handleHash()) {
+      showLanding(false);
+    }
+  });
 
   // Try hash-based routing first
   if (!handleHash()) {
