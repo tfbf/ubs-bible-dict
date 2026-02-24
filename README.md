@@ -93,9 +93,7 @@ cd ubs-open-license/flora-fauna-realia/XML
 python build_site.py
 ```
 
-This parses all three XML files and writes `data.js` to the app directory. Output:
-
-```
+This parses all three XML files and writes `data.js` to the app directory. 
 
 If `strongs_map.json` exists, Strong’s IDs are embedded per language set and shown in the right sidebar as external links.
 
@@ -134,7 +132,6 @@ Parsing REALIA_en.xml... → 507 entries
 ✓ Generated data.js
   Total entries: 762
   File size: 3.4 MB
-```
 
 ---
 
