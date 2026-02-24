@@ -38,6 +38,7 @@ This project makes three scholarly handbooks — originally published by the **U
 - **Mobile-first responsive design** — Collapsible panels with bottom navigation on small screens
 - **Keyboard shortcuts** — `/` to search, `Alt+↑/↓` to navigate entries, `Esc` to close panels
 - **URL hash routing** — Shareable deep links to any entry (e.g., `#fauna/2.13`)
+- **Optional Strong’s enrichment** — Attach Strong’s IDs to lemmas and open them directly in BibleHub
 - **Zero dependencies** — Pure HTML, CSS, and vanilla JavaScript; no frameworks or build tools needed at runtime
 - **Offline-capable** — Fully static; works from the local filesystem or any web server
 
@@ -63,6 +64,7 @@ ubs-open-license/flora-fauna-realia/XML/
 ├── FAUNA_en.xml      # Source XML
 ├── FLORA_en.xml
 ├── REALIA_en.xml
+├── strongs_map.json   # Optional lemma → Strong's mapping (user-provided)
 └── build_site.py     # XML → data.js generator
 ```
 
@@ -94,6 +96,37 @@ python build_site.py
 This parses all three XML files and writes `data.js` to the app directory. Output:
 
 ```
+
+If `strongs_map.json` exists, Strong’s IDs are embedded per language set and shown in the right sidebar as external links.
+
+### Strong’s Mapping (Optional)
+
+To enable Strong’s integration:
+
+1. Copy `ubs-open-license/flora-fauna-realia/XML/strongs_map.template.json` to `strongs_map.json`.
+2. Add mappings by **language + lemma/transliteration**.
+3. Re-run `python build_site.py`.
+
+Expected schema:
+
+```json
+{
+  "Hebrew": {
+    "בְּהֵמָה": ["H0929"],
+    "behemah": ["H0929"]
+  },
+  "Greek": {
+    "ζῷον": ["G2226"],
+    "zōon": ["G2226"]
+  }
+}
+```
+
+Notes:
+
+- IDs are normalized to `H####` / `G####` format.
+- Multiple IDs per lemma are supported.
+- When available, the app adds quick links to BibleHub (`https://biblehub.com/hebrew/####.htm` or `https://biblehub.com/greek/####.htm`).
 Parsing FAUNA_en.xml...  → 114 entries
 Parsing FLORA_en.xml...  → 141 entries
 Parsing REALIA_en.xml... → 507 entries

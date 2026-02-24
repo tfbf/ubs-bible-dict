@@ -234,9 +234,6 @@ function renderEntry(entry) {
         if (ls.transliteration) {
           html += ` <span class="lang-translit">(${escHtml(ls.transliteration)})</span>`;
         }
-        if (ls.references && ls.references.length > 0) {
-          html += `<div class="lang-refs">${ls.references.join('; ')}</div>`;
-        }
         html += `</div>`;
       }
     }
@@ -302,9 +299,31 @@ function renderRightPanel(entry) {
         }
         html += `</div>`;
       }
+
+      if (ls.strongs && ls.strongs.length > 0) {
+        html += `<div class="right-strongs-list">`;
+        for (const strongsId of ls.strongs) {
+          const id = escHtml(strongsId);
+          const bhLink = strongsBibleHubUrl(strongsId);
+          html += `<a class="right-strongs-item" href="${bhLink}" target="_blank" rel="noopener" title="Open ${id} on BibleHub">${id}</a>`;
+        }
+        html += `</div>`;
+      }
       html += `</div>`;
     }
     html += `</div>`;
+  }
+
+  const entryStrongs = collectEntryStrongs(entry);
+  if (entryStrongs.length > 0) {
+    html += `<div class="right-section">`;
+    html += `<div class="right-section-title">Strong's Links (${entryStrongs.length})</div>`;
+    html += `<div class="right-strongs-list">`;
+    for (const strongsId of entryStrongs) {
+      const id = escHtml(strongsId);
+      html += `<a class="right-strongs-item" href="${strongsBibleHubUrl(strongsId)}" target="_blank" rel="noopener">BibleHub ${id}</a>`;
+    }
+    html += `</div></div>`;
   }
 
   // All unique references
@@ -355,6 +374,39 @@ function resolveTarget(target) {
     return entryMap[`${book}:${key}`];
   }
   return null;
+}
+
+function strongsBibleHubUrl(strongsId) {
+  const normalized = normalizeStrongsId(strongsId);
+  if (!normalized) return 'https://biblehub.com';
+  const prefix = normalized[0].toUpperCase();
+  const num = parseInt(normalized.slice(1), 10);
+  if (!Number.isFinite(num)) return 'https://biblehub.com';
+  const langPath = prefix === 'H' ? 'hebrew' : prefix === 'G' ? 'greek' : '';
+  if (!langPath) return 'https://biblehub.com';
+  return `https://biblehub.com/${langPath}/${num}.htm`;
+}
+
+function normalizeStrongsId(strongsId) {
+  const raw = (strongsId || '').toString().trim().toUpperCase().replace(/\s+/g, '');
+  const match = raw.match(/^([HG])(\d{1,5})$/);
+  if (!match) return '';
+  const [, prefix, digits] = match;
+  return `${prefix}${parseInt(digits, 10).toString().padStart(4, '0')}`;
+}
+
+function collectEntryStrongs(entry) {
+  const values = [];
+  if (!entry || !entry.languageSets) return values;
+  for (const ls of entry.languageSets) {
+    if (ls.strongs && Array.isArray(ls.strongs)) {
+      for (const id of ls.strongs) {
+        const normalized = normalizeStrongsId(id);
+        if (normalized) values.push(normalized);
+      }
+    }
+  }
+  return Array.from(new Set(values));
 }
 
 // ── Search ────────────────────────────────────────────────────────
