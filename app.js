@@ -15,6 +15,47 @@ if (!SOURCE_TERM_MODES.includes(sourceTermMode)) {
 
 const BOOK_LABELS = { fauna: 'Fauna', flora: 'Flora', realia: 'Realia' };
 const BOOK_ICONS  = { fauna: '🦁', flora: '🌿', realia: '⚒️' };
+const ENTRY_BOOK_POSITION = { fauna: 0, flora: 1, realia: 2 };
+const REF_BOOK_ORDER = [
+  'Gen', 'Exod', 'Lev', 'Num', 'Deut', 'Josh', 'Judg', 'Ruth', '1 Sam', '2 Sam',
+  '1 Kgs', '2 Kgs', '1 Chr', '2 Chr', 'Ezra', 'Neh', 'Esth', 'Job', 'Ps', 'Prov',
+  'Eccl', 'Song', 'Isa', 'Jer', 'Lam', 'Ezek', 'Dan', 'Hos', 'Joel', 'Amos',
+  'Obad', 'Jonah', 'Mic', 'Nah', 'Hab', 'Zeph', 'Hag', 'Zech', 'Mal',
+  'Matt', 'Mark', 'Luke', 'John', 'Acts', 'Rom', '1 Cor', '2 Cor', 'Gal',
+  'Eph', 'Phil', 'Col', '1 Thess', '2 Thess', '1 Tim', '2 Tim',
+  'Titus', 'Phlm', 'Heb', 'Jas', '1 Pet', '2 Pet', '1 John', '2 John', '3 John', 'Jude', 'Rev',
+  'Tob', 'Jdt', 'AddEsth', 'Wis', 'Sir', 'Bar', 'EpJer', 'SgThree', 'Sus', 'Bel',
+  '1 Macc', '2 Macc', '1 Esd', 'PrMan', 'Ps 151', '3 Macc', '2 Esd', '4 Macc',
+];
+const REF_BOOK_POSITION = Object.fromEntries(REF_BOOK_ORDER.map((book, idx) => [book, idx]));
+const KJV_BOOK_NAMES = {
+  'Gen': 'Genesis', 'Exod': 'Exodus', 'Lev': 'Leviticus', 'Num': 'Numbers', 'Deut': 'Deuteronomy',
+  'Josh': 'Joshua', 'Judg': 'Judges', 'Ruth': 'Ruth', '1 Sam': '1 Samuel', '2 Sam': '2 Samuel',
+  '1 Kgs': '1 Kings', '2 Kgs': '2 Kings', '1 Chr': '1 Chronicles', '2 Chr': '2 Chronicles',
+  'Ezra': 'Ezra', 'Neh': 'Nehemiah', 'Esth': 'Esther', 'Job': 'Job', 'Ps': 'Psalms', 'Prov': 'Proverbs',
+  'Eccl': 'Ecclesiastes', 'Song': 'Song of Solomon', 'Isa': 'Isaiah', 'Jer': 'Jeremiah', 'Lam': 'Lamentations',
+  'Ezek': 'Ezekiel', 'Dan': 'Daniel', 'Hos': 'Hosea', 'Joel': 'Joel', 'Amos': 'Amos',
+  'Obad': 'Obadiah', 'Jonah': 'Jonah', 'Mic': 'Micah', 'Nah': 'Nahum', 'Hab': 'Habakkuk',
+  'Zeph': 'Zephaniah', 'Hag': 'Haggai', 'Zech': 'Zechariah', 'Mal': 'Malachi',
+  'Matt': 'Matthew', 'Mark': 'Mark', 'Luke': 'Luke', 'John': 'John', 'Acts': 'Acts',
+  'Rom': 'Romans', '1 Cor': '1 Corinthians', '2 Cor': '2 Corinthians', 'Gal': 'Galatians',
+  'Eph': 'Ephesians', 'Phil': 'Philippians', 'Col': 'Colossians', '1 Thess': '1 Thessalonians',
+  '2 Thess': '2 Thessalonians', '1 Tim': '1 Timothy', '2 Tim': '2 Timothy', 'Titus': 'Titus',
+  'Phlm': 'Philemon', 'Heb': 'Hebrews', 'Jas': 'James', '1 Pet': '1 Peter', '2 Pet': '2 Peter',
+  '1 John': '1 John', '2 John': '2 John', '3 John': '3 John', 'Jude': 'Jude', 'Rev': 'Revelation',
+};
+const REF_BOOK_ALIASES = buildBookAliasMap();
+const reverseRefIndex = new Map();
+const indexedReferences = [];
+const reverseLookupState = {
+  query: '',
+  results: [],
+  error: '',
+  matchedVerses: 0,
+  verseStatus: 'idle',
+  verseError: '',
+  verseTexts: [],
+};
 
 // ── DOM references ────────────────────────────────────────────────
 const $landing       = document.getElementById('landing');
@@ -58,6 +99,112 @@ function addLemmaIndex(language, term, entry) {
   }
 }
 
+function buildBookAliasMap() {
+  const aliases = {};
+  const addAlias = (alias, canonical) => {
+    const key = (alias || '').toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
+    if (!key) return;
+    aliases[key] = canonical;
+  };
+
+  for (const canonical of REF_BOOK_ORDER) {
+    addAlias(canonical, canonical);
+  }
+
+  const fullNames = {
+    genesis: 'Gen', exodus: 'Exod', leviticus: 'Lev', numbers: 'Num', deuteronomy: 'Deut',
+    joshua: 'Josh', judges: 'Judg', ruth: 'Ruth',
+    '1 samuel': '1 Sam', '2 samuel': '2 Sam',
+    '1 kings': '1 Kgs', '2 kings': '2 Kgs',
+    '1 chronicles': '1 Chr', '2 chronicles': '2 Chr',
+    ezra: 'Ezra', nehemiah: 'Neh', esther: 'Esth', job: 'Job', psalm: 'Ps', psalms: 'Ps',
+    proverbs: 'Prov', ecclesiastes: 'Eccl', song: 'Song',
+    'song of solomon': 'Song', isaiah: 'Isa', jeremiah: 'Jer', lamentations: 'Lam', ezekiel: 'Ezek',
+    daniel: 'Dan', hosea: 'Hos', joel: 'Joel', amos: 'Amos', obadiah: 'Obad', jonah: 'Jonah',
+    micah: 'Mic', nahum: 'Nah', habakkuk: 'Hab', zephaniah: 'Zeph', haggai: 'Hag',
+    zechariah: 'Zech', malachi: 'Mal', matthew: 'Matt', mark: 'Mark', luke: 'Luke', john: 'John',
+    acts: 'Acts', romans: 'Rom', '1 corinthians': '1 Cor', '2 corinthians': '2 Cor',
+    galatians: 'Gal', ephesians: 'Eph', philippians: 'Phil', colossians: 'Col',
+    '1 thessalonians': '1 Thess', '2 thessalonians': '2 Thess', '1 timothy': '1 Tim',
+    '2 timothy': '2 Tim', titus: 'Titus', philemon: 'Phlm', hebrews: 'Heb', james: 'Jas',
+    '1 peter': '1 Pet', '2 peter': '2 Pet', '1 john': '1 John', '2 john': '2 John',
+    '3 john': '3 John', jude: 'Jude', revelation: 'Rev',
+  };
+
+  for (const [alias, canonical] of Object.entries(fullNames)) {
+    addAlias(alias, canonical);
+  }
+
+  return aliases;
+}
+
+function normalizeBookToken(book) {
+  const key = (book || '').toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
+  return REF_BOOK_ALIASES[key] || '';
+}
+
+function parseReferenceUnit(text, context = {}) {
+  const normalized = (text || '').trim().replace(/\s+/g, ' ');
+  if (!normalized) return null;
+
+  const full = normalized.match(/^(.+?)\s+(\d+):(\d+)$/);
+  if (full) {
+    const book = normalizeBookToken(full[1]);
+    const chapter = parseInt(full[2], 10);
+    const verse = parseInt(full[3], 10);
+    if (!book || !Number.isFinite(chapter) || !Number.isFinite(verse)) return null;
+    return { book, chapter, verse };
+  }
+
+  if (context.book) {
+    const chapterVerse = normalized.match(/^(\d+):(\d+)$/);
+    if (chapterVerse) {
+      const chapter = parseInt(chapterVerse[1], 10);
+      const verse = parseInt(chapterVerse[2], 10);
+      if (!Number.isFinite(chapter) || !Number.isFinite(verse)) return null;
+      return { book: context.book, chapter, verse };
+    }
+
+    const verseOnly = normalized.match(/^(\d+)$/);
+    if (verseOnly && Number.isFinite(context.chapter)) {
+      const verse = parseInt(verseOnly[1], 10);
+      if (!Number.isFinite(verse)) return null;
+      return { book: context.book, chapter: context.chapter, verse };
+    }
+  }
+
+  return null;
+}
+
+function makeVerseKey(ref) {
+  return `${ref.book}|${ref.chapter}|${ref.verse}`;
+}
+
+function compareReferences(a, b) {
+  const bookA = REF_BOOK_POSITION[a.book] ?? Number.MAX_SAFE_INTEGER;
+  const bookB = REF_BOOK_POSITION[b.book] ?? Number.MAX_SAFE_INTEGER;
+  if (bookA !== bookB) return bookA - bookB;
+  if (a.chapter !== b.chapter) return a.chapter - b.chapter;
+  return a.verse - b.verse;
+}
+
+function indexEntryReference(referenceText, entry) {
+  const parsed = parseReferenceUnit(referenceText);
+  if (!parsed) return;
+
+  const verseKey = makeVerseKey(parsed);
+  if (!reverseRefIndex.has(verseKey)) {
+    reverseRefIndex.set(verseKey, []);
+    indexedReferences.push({ ...parsed, verseKey });
+  }
+
+  const entryId = `${entry.book}:${entry.key}`;
+  const bucket = reverseRefIndex.get(verseKey);
+  if (!bucket.some(item => item.id === entryId)) {
+    bucket.push({ id: entryId, book: entry.book, key: entry.key, title: entry.title });
+  }
+}
+
 for (const [book, entries] of Object.entries(DICTIONARY_DATA)) {
   for (const entry of entries) {
     entryMap[`${book}:${entry.key}`] = entry;
@@ -65,6 +212,10 @@ for (const [book, entries] of Object.entries(DICTIONARY_DATA)) {
     for (const ls of (entry.languageSets || [])) {
       addLemmaIndex(ls.language, ls.lemma, entry);
       addLemmaIndex(ls.language, ls.transliteration, entry);
+    }
+
+    for (const referenceText of (entry.references || [])) {
+      indexEntryReference(referenceText, entry);
     }
 
     // Pre-compute searchText lazily on first access
@@ -376,10 +527,275 @@ function clearEntry() {
     </div>`;
 }
 
+function parseReferenceQuery(query) {
+  const cleaned = (query || '').trim().replace(/[–—]/g, '-').replace(/\s*\-\s*/g, '-').replace(/\s+/g, ' ');
+  if (!cleaned) {
+    return { error: 'Enter a reference like John 3:16 or John 3:16-18.' };
+  }
+
+  const dashIndex = cleaned.indexOf('-');
+  if (dashIndex === -1) {
+    const single = parseReferenceUnit(cleaned);
+    if (!single) {
+      return { error: 'Reference format not recognized. Use Book Chapter:Verse.' };
+    }
+    return { start: single, end: single };
+  }
+
+  const left = cleaned.slice(0, dashIndex).trim();
+  const right = cleaned.slice(dashIndex + 1).trim();
+  const start = parseReferenceUnit(left);
+  if (!start) {
+    return { error: 'Range start is invalid. Try John 3:16-18.' };
+  }
+
+  const end = parseReferenceUnit(right, { book: start.book, chapter: start.chapter });
+  if (!end) {
+    return { error: 'Range end is invalid. Use verse only, chapter:verse, or full reference.' };
+  }
+
+  if (compareReferences(start, end) <= 0) {
+    return { start, end };
+  }
+  return { start: end, end: start };
+}
+
+function formatSingleReference(ref) {
+  return `${ref.book} ${ref.chapter}:${ref.verse}`;
+}
+
+function formatLookupRangeLabel(start, end) {
+  if (!start || !end) return '';
+  if (start.book === end.book && start.chapter === end.chapter && start.verse === end.verse) {
+    return formatSingleReference(start);
+  }
+  if (start.book === end.book && start.chapter === end.chapter) {
+    return `${start.book} ${start.chapter}:${start.verse}-${end.verse}`;
+  }
+  if (start.book === end.book) {
+    return `${start.book} ${start.chapter}:${start.verse}-${end.chapter}:${end.verse}`;
+  }
+  return `${formatSingleReference(start)} - ${formatSingleReference(end)}`;
+}
+
+function toKjvBookName(book) {
+  return KJV_BOOK_NAMES[book] || book;
+}
+
+function formatReferenceForBibleApi(start, end) {
+  if (!start || !end) return '';
+  const startBook = toKjvBookName(start.book);
+  const endBook = toKjvBookName(end.book);
+
+  if (start.book === end.book && start.chapter === end.chapter && start.verse === end.verse) {
+    return `${startBook} ${start.chapter}:${start.verse}`;
+  }
+  if (start.book === end.book && start.chapter === end.chapter) {
+    return `${startBook} ${start.chapter}:${start.verse}-${end.verse}`;
+  }
+  if (start.book === end.book) {
+    return `${startBook} ${start.chapter}:${start.verse}-${end.chapter}:${end.verse}`;
+  }
+  return `${startBook} ${start.chapter}:${start.verse}-${endBook} ${end.chapter}:${end.verse}`;
+}
+
+function normalizeVerseText(text) {
+  return (text || '').toString().replace(/\s+/g, ' ').trim();
+}
+
+async function fetchLookupVerseText(rawQuery) {
+  const query = (rawQuery || '').trim();
+  if (!query) {
+    reverseLookupState.verseStatus = 'idle';
+    reverseLookupState.verseTexts = [];
+    reverseLookupState.verseError = '';
+    return;
+  }
+
+  const parsed = parseReferenceQuery(query);
+  if (parsed.error) {
+    reverseLookupState.verseStatus = 'error';
+    reverseLookupState.verseTexts = [];
+    reverseLookupState.verseError = parsed.error;
+    return;
+  }
+
+  const lookupToken = `${formatLookupRangeLabel(parsed.start, parsed.end)}|${Date.now()}`;
+  reverseLookupState._lookupToken = lookupToken;
+  reverseLookupState.verseStatus = 'loading';
+  reverseLookupState.verseTexts = [];
+  reverseLookupState.verseError = '';
+  const liveEntry = entryMap[`${currentBook}:${currentEntryKey}`];
+  if (liveEntry) {
+    renderRightPanel(liveEntry);
+  }
+
+  const apiReference = formatReferenceForBibleApi(parsed.start, parsed.end);
+  const endpoint = `https://bible-api.com/${encodeURIComponent(apiReference)}?translation=kjv`;
+
+  try {
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    if (reverseLookupState._lookupToken !== lookupToken || reverseLookupState.query !== query) {
+      return;
+    }
+
+    const verses = [];
+    if (Array.isArray(payload.verses) && payload.verses.length > 0) {
+      for (const verse of payload.verses) {
+        const bookName = verse.book_name || '';
+        const chapter = verse.chapter;
+        const number = verse.verse;
+        if (!bookName || !Number.isFinite(chapter) || !Number.isFinite(number)) continue;
+        verses.push({
+          label: `${bookName} ${chapter}:${number}`,
+          text: normalizeVerseText(verse.text),
+        });
+      }
+    } else if (payload.text) {
+      const fallbackLabel = payload.reference || formatLookupRangeLabel(parsed.start, parsed.end);
+      verses.push({ label: fallbackLabel, text: normalizeVerseText(payload.text) });
+    }
+
+    reverseLookupState.verseTexts = verses;
+    reverseLookupState.verseStatus = verses.length > 0 ? 'ready' : 'error';
+    reverseLookupState.verseError = verses.length > 0 ? '' : 'Verse text is unavailable for this reference in KJV via the current service.';
+  } catch (error) {
+    if (reverseLookupState._lookupToken !== lookupToken || reverseLookupState.query !== query) {
+      return;
+    }
+    reverseLookupState.verseStatus = 'error';
+    reverseLookupState.verseTexts = [];
+    reverseLookupState.verseError = 'Could not load verse text right now. Please try again.';
+  }
+
+  const latestEntry = entryMap[`${currentBook}:${currentEntryKey}`];
+  if (latestEntry) {
+    renderRightPanel(latestEntry);
+  }
+}
+
+function parseEntryKeySegments(key) {
+  return (key || '')
+    .split('.')
+    .map(v => parseInt(v, 10))
+    .map(v => (Number.isFinite(v) ? v : Number.MAX_SAFE_INTEGER));
+}
+
+function compareLookupEntries(a, b) {
+  const bookPosA = ENTRY_BOOK_POSITION[a.book] ?? Number.MAX_SAFE_INTEGER;
+  const bookPosB = ENTRY_BOOK_POSITION[b.book] ?? Number.MAX_SAFE_INTEGER;
+  if (bookPosA !== bookPosB) return bookPosA - bookPosB;
+
+  const segA = parseEntryKeySegments(a.key);
+  const segB = parseEntryKeySegments(b.key);
+  const maxLen = Math.max(segA.length, segB.length);
+  for (let i = 0; i < maxLen; i += 1) {
+    const va = segA[i] ?? -1;
+    const vb = segB[i] ?? -1;
+    if (va !== vb) return va - vb;
+  }
+
+  return a.title.localeCompare(b.title);
+}
+
+function performReferenceLookup(rawQuery) {
+  const query = (rawQuery || '').trim();
+  reverseLookupState.query = query;
+  reverseLookupState.error = '';
+  reverseLookupState.results = [];
+  reverseLookupState.matchedVerses = 0;
+  reverseLookupState.verseStatus = query ? 'loading' : 'idle';
+  reverseLookupState.verseError = '';
+  reverseLookupState.verseTexts = [];
+
+  const parsed = parseReferenceQuery(query);
+  if (parsed.error) {
+    reverseLookupState.error = parsed.error;
+    return;
+  }
+
+  const matchedEntries = new Map();
+  let matchedVerses = 0;
+
+  for (const ref of indexedReferences) {
+    if (compareReferences(ref, parsed.start) < 0) continue;
+    if (compareReferences(ref, parsed.end) > 0) continue;
+    matchedVerses += 1;
+
+    const entries = reverseRefIndex.get(ref.verseKey) || [];
+    for (const entry of entries) {
+      if (!matchedEntries.has(entry.id)) {
+        matchedEntries.set(entry.id, entry);
+      }
+    }
+  }
+
+  reverseLookupState.matchedVerses = matchedVerses;
+  reverseLookupState.results = Array.from(matchedEntries.values()).sort(compareLookupEntries);
+}
+
+function renderReverseLookupSection() {
+  const state = reverseLookupState;
+  let html = '';
+
+  html += `<div class="right-section right-ref-lookup">`;
+  html += `<div class="right-section-title">Reference Lookup</div>`;
+  html += `<form class="ref-lookup-form">`;
+  html += `<input type="search" class="ref-lookup-input" name="reference" placeholder="e.g. John 3:16 or John 3:16-18" value="${escHtml(state.query)}" autocomplete="off" spellcheck="false">`;
+  html += `<button type="submit" class="ref-lookup-btn">Find Entries</button>`;
+  html += `</form>`;
+  html += `<div class="ref-lookup-hint">Supports verse and verse ranges.</div>`;
+
+  if (state.error) {
+    html += `<div class="ref-lookup-message is-error">${escHtml(state.error)}</div>`;
+  } else if (state.query) {
+    if (state.results.length > 0) {
+      html += `<div class="ref-lookup-message">${state.results.length} entries across ${state.matchedVerses} verse${state.matchedVerses === 1 ? '' : 's'}.</div>`;
+      html += `<div class="ref-lookup-results">`;
+      for (const result of state.results) {
+        const active = currentBook === result.book && currentEntryKey === result.key ? ' is-active' : '';
+        html += `<button class="ref-lookup-item${active}" data-book="${escHtml(result.book)}" data-key="${escHtml(result.key)}" type="button">`;
+        html += `<span class="ref-lookup-item-title">${escHtml(result.title)}</span>`;
+        html += `<span class="ref-lookup-item-meta">${escHtml(BOOK_LABELS[result.book])} · ${escHtml(result.key)}</span>`;
+        html += `</button>`;
+      }
+      html += `</div>`;
+    } else {
+      html += `<div class="ref-lookup-message">No entries found for this reference.</div>`;
+    }
+
+    html += `<div class="ref-lookup-verses">`;
+    html += `<div class="ref-lookup-verses-title">Verse Text (KJV)</div>`;
+    if (state.verseStatus === 'loading') {
+      html += `<div class="ref-lookup-message">Loading verse text…</div>`;
+    } else if (state.verseStatus === 'error') {
+      html += `<div class="ref-lookup-message is-error">${escHtml(state.verseError || 'Verse text could not be loaded.')}</div>`;
+    } else if (state.verseTexts.length > 0) {
+      html += `<div class="ref-lookup-verse-list">`;
+      for (const verse of state.verseTexts) {
+        html += `<div class="ref-lookup-verse-item">`;
+        html += `<div class="ref-lookup-verse-label">${escHtml(verse.label)}</div>`;
+        html += `<div class="ref-lookup-verse-text">${escHtml(verse.text)}</div>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
 // ── Right panel rendering ─────────────────────────────────────────
 
 function renderRightPanel(entry) {
   let html = '';
+  html += renderReverseLookupSection();
 
   // Language sets
   if (entry.languageSets && entry.languageSets.length > 0) {
@@ -399,7 +815,7 @@ function renderRightPanel(entry) {
       if (ls.references && ls.references.length > 0) {
         html += `<div class="right-ref-list">`;
         for (const ref of ls.references) {
-          html += `<span class="right-ref-item">${escHtml(ref)}</span>`;
+          html += `<button class="right-ref-item right-ref-lookup-trigger" type="button" data-reference="${escHtml(ref)}">${escHtml(ref)}</button>`;
         }
         html += `</div>`;
       }
@@ -436,7 +852,7 @@ function renderRightPanel(entry) {
     html += `<div class="right-section-title">Scripture References (${entry.references.length})</div>`;
     html += `<div class="right-ref-list">`;
     for (const ref of entry.references) {
-      html += `<span class="right-ref-item">${escHtml(ref)}</span>`;
+      html += `<button class="right-ref-item right-ref-lookup-trigger" type="button" data-reference="${escHtml(ref)}">${escHtml(ref)}</button>`;
     }
     html += `</div></div>`;
   }
@@ -462,6 +878,40 @@ function renderRightPanel(entry) {
   html += `</div>`;
 
   $rightContent.innerHTML = html;
+
+  const lookupForm = $rightContent.querySelector('.ref-lookup-form');
+  if (lookupForm) {
+    lookupForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const input = lookupForm.querySelector('.ref-lookup-input');
+      const query = input ? input.value : '';
+      performReferenceLookup(query);
+      renderRightPanel(entry);
+      fetchLookupVerseText(query);
+    });
+  }
+
+  $rightContent.querySelectorAll('.right-ref-lookup-trigger').forEach(el => {
+    el.addEventListener('click', () => {
+      const reference = (el.dataset.reference || '').trim();
+      if (!reference) return;
+      performReferenceLookup(reference);
+      renderRightPanel(entry);
+      fetchLookupVerseText(reference);
+    });
+  });
+
+  $rightContent.querySelectorAll('.ref-lookup-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const book = el.dataset.book;
+      const key = el.dataset.key;
+      if (!book || !key) return;
+      if (book !== currentBook) {
+        switchBook(book);
+      }
+      selectEntry(key);
+    });
+  });
 
   // Attach cross-ref handlers in right panel
   $rightContent.querySelectorAll('.right-crossref-item').forEach(el => {
