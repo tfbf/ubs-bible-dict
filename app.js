@@ -13,9 +13,10 @@ if (!SOURCE_TERM_MODES.includes(sourceTermMode)) {
   sourceTermMode = 'both';
 }
 
-const BOOK_LABELS = { fauna: 'Fauna', flora: 'Flora', realia: 'Realia' };
-const BOOK_ICONS  = { fauna: '🦁', flora: '🌿', realia: '⚒️' };
-const ENTRY_BOOK_POSITION = { fauna: 0, flora: 1, realia: 2 };
+const BOOK_LABELS = { fauna: 'Fauna', flora: 'Flora', realia: 'Realia', greek: 'Greek', hebrew: 'Hebrew' };
+const BOOK_ICONS  = { fauna: '🦁', flora: '🌿', realia: '⚒️', greek: 'ΑΩ', hebrew: 'אב' };
+const ENTRY_BOOK_POSITION = { fauna: 0, flora: 1, realia: 2, greek: 3, hebrew: 4 };
+let rightPanelTab = 'details';
 const REF_BOOK_ORDER = [
   'Gen', 'Exod', 'Lev', 'Num', 'Deut', 'Josh', 'Judg', 'Ruth', '1 Sam', '2 Sam',
   '1 Kgs', '2 Kgs', '1 Chr', '2 Chr', 'Ezra', 'Neh', 'Esth', 'Job', 'Ps', 'Prov',
@@ -75,6 +76,14 @@ const $middlePanel   = document.getElementById('middlePanel');
 const $searchResults = document.createElement('div');
 $searchResults.className = 'search-results';
 document.getElementById('app').appendChild($searchResults);
+
+// ── Dictionary data (populated lazily) ───────────────────────────
+// Thematic books (fauna/flora/realia) are loaded up-front as separate script tags.
+// Greek and Hebrew are loaded on-demand when the user first opens those tabs.
+const DICTIONARY_DATA = {};
+
+// Track load state: 'loaded' | 'loading' | 'error' | undefined
+const _bookLoadState = {};
 
 // ── Build flat lookup + search index ──────────────────────────────
 const entryMap = {};  // "fauna:1.1" → entry object
@@ -205,7 +214,9 @@ function indexEntryReference(referenceText, entry) {
   }
 }
 
-for (const [book, entries] of Object.entries(DICTIONARY_DATA)) {
+function registerBook(book, entries) {
+  DICTIONARY_DATA[book] = entries;
+  _bookLoadState[book] = 'loaded';
   for (const entry of entries) {
     entryMap[`${book}:${entry.key}`] = entry;
 
@@ -241,6 +252,48 @@ for (const [book, entries] of Object.entries(DICTIONARY_DATA)) {
   }
 }
 
+// Lazy-load a per-book data file (<book> = 'greek' or 'hebrew').
+// Returns a Promise that resolves when the book is ready.
+function loadBookData(book) {
+  if (_bookLoadState[book] === 'loaded') return Promise.resolve();
+  if (_bookLoadState[book] === 'loading') {
+    // Return a promise that polls until done
+    return new Promise((resolve, reject) => {
+      const interval = setInterval(() => {
+        if (_bookLoadState[book] === 'loaded') { clearInterval(interval); resolve(); }
+        else if (_bookLoadState[book] === 'error') { clearInterval(interval); reject(new Error(`Failed to load ${book}`)); }
+      }, 50);
+    });
+  }
+
+  _bookLoadState[book] = 'loading';
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = `data-${book}.js`;
+    script.onload = () => {
+      const varName = `DICTIONARY_DATA_${book.toUpperCase()}`;
+      const data = window[varName];
+      if (!data) {
+        _bookLoadState[book] = 'error';
+        reject(new Error(`${varName} not defined after loading`));
+        return;
+      }
+      registerBook(book, data);
+      resolve();
+    };
+    script.onerror = () => {
+      _bookLoadState[book] = 'error';
+      reject(new Error(`Failed to load data-${book}.js`));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+// Register the always-available thematic books
+registerBook('fauna', typeof DICTIONARY_DATA_FAUNA !== 'undefined' ? DICTIONARY_DATA_FAUNA : []);
+registerBook('flora', typeof DICTIONARY_DATA_FLORA !== 'undefined' ? DICTIONARY_DATA_FLORA : []);
+registerBook('realia', typeof DICTIONARY_DATA_REALIA !== 'undefined' ? DICTIONARY_DATA_REALIA : []);
+
 // ── View switching ────────────────────────────────────────────────
 
 function showLanding() {
@@ -273,6 +326,31 @@ function switchBook(book) {
   });
 
   $navTitle.textContent = BOOK_LABELS[book];
+
+  // For lazy books (greek/hebrew), show a loading state while fetching
+  if (_bookLoadState[book] !== 'loaded') {
+    renderEntryList();
+    clearEntry();
+    $navFilter.value = '';
+    $searchInput.value = '';
+    closeSearchResults();
+
+    // Show a loading placeholder
+    $entryList.innerHTML = '<div class="entry-list-loading"><div class="loading-spinner"></div><p>Loading ' + BOOK_LABELS[book] + ' dictionary…</p></div>';
+
+    loadBookData(book).then(() => {
+      if (currentBook !== book) return; // user navigated away
+      renderEntryList();
+      const entries = DICTIONARY_DATA[book];
+      if (entries && entries.length > 0) selectEntry(entries[0].key);
+      updateHash();
+    }).catch(err => {
+      if (currentBook !== book) return;
+      $entryList.innerHTML = '<div class="entry-list-error"><p>Failed to load ' + BOOK_LABELS[book] + ' data.</p></div>';
+      console.error(err);
+    });
+    return;
+  }
 
   renderEntryList();
   clearEntry();
@@ -355,15 +433,18 @@ function selectEntry(key) {
 
 // Navigate to a cross-reference (possibly in another book)
 function navigateTo(target) {
-  // Target format: "FAUNA:2.13" or "FLORA:1.5"
-  const match = target.match(/^(FAUNA|FLORA|REALIA):(.+)$/i);
+  // Target format: "FAUNA:2.13" or "GREEK:abc123"
+  const match = target.match(/^(FAUNA|FLORA|REALIA|GREEK|HEBREW):(.+)$/i);
   if (match) {
     const book = match[1].toLowerCase();
     const key = match[2];
-    if (book !== currentBook) {
-      switchBook(book);
+    if (_bookLoadState[book] !== 'loaded') {
+      if (book !== currentBook) switchBook(book);
+      loadBookData(book).then(() => selectEntry(key));
+    } else {
+      if (book !== currentBook) switchBook(book);
+      selectEntry(key);
     }
-    selectEntry(key);
   }
 }
 
@@ -387,7 +468,7 @@ function renderEntry(entry, options = {}) {
   html += `</div>`;
 
   // Compact terms strip (instead of bulky References section)
-  if (compactTerms.length > 0) {
+  if (compactTerms.length > 0 && ['fauna', 'flora', 'realia'].includes(entry.book)) {
     const modeLabel = sourceTermMode === 'original' ? 'Original' : sourceTermMode === 'translit' ? 'Translit' : 'Both';
     html += `<div class="entry-term-strip">`;
     html += `<div class="entry-term-strip-head">`;
@@ -791,13 +872,118 @@ function renderReverseLookupSection() {
   return html;
 }
 
-// ── Right panel rendering ─────────────────────────────────────────
+function renderMetadataSection(entry) {
+  const meta = entry.meta || {};
+  const semanticDomains = Array.isArray(entry.semanticDomains) ? entry.semanticDomains : [];
+  const hasMeta = semanticDomains.length > 0 || (meta && Object.keys(meta).length > 0);
+  if (!hasMeta) return '';
 
-function renderRightPanel(entry) {
+  let html = '<div class="right-section">';
+  html += '<div class="right-section-title">Lexical Metadata</div>';
+
+  if (semanticDomains.length > 0) {
+    html += '<div class="right-meta-group">';
+    html += '<div class="right-meta-label">Semantic Domains</div>';
+    html += '<div class="right-meta-chip-list">';
+    for (const domain of semanticDomains.slice(0, 24)) {
+      const code = (domain.code || '').trim();
+      const label = (domain.label || '').trim();
+      const text = [code, label].filter(Boolean).join(' · ');
+      if (text) {
+        html += `<span class="right-meta-chip">${escHtml(text)}</span>`;
+      }
+    }
+    html += '</div></div>';
+  }
+
+  const metaRows = [
+    ['Entry ID', meta.entryId],
+    ['Version', meta.version],
+    ['Alphabet Position', meta.alphaPos],
+    ['Has Aramaic', meta.hasAramaic],
+    ['In LXX', meta.inLXX],
+  ];
+  for (const [label, value] of metaRows) {
+    if (!value) continue;
+    html += `<div class="right-meta-row"><span class="right-meta-k">${escHtml(label)}</span><span class="right-meta-v">${escHtml(String(value))}</span></div>`;
+  }
+
+  const listRows = [
+    ['Authors', meta.authors],
+    ['Contributors', meta.contributors],
+    ['Alternate Lemmas', meta.alternateLemmas],
+    ['Main Links', meta.mainLinks],
+    ['Editorial Notes', meta.notes],
+  ];
+  for (const [label, values] of listRows) {
+    if (!Array.isArray(values) || values.length === 0) continue;
+    html += `<div class="right-meta-group"><div class="right-meta-label">${escHtml(label)}</div>`;
+    html += '<ul class="right-meta-list">';
+    for (const value of values.slice(0, 20)) {
+      html += `<li>${escHtml(value)}</li>`;
+    }
+    html += '</ul></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function renderRelatedEntriesSection(entry) {
+  const relatedEntries = Array.isArray(entry.relatedEntries) ? entry.relatedEntries : [];
+  const crossRefs = Array.isArray(entry.crossRefs) ? entry.crossRefs : [];
+  if (relatedEntries.length === 0 && crossRefs.length === 0) {
+    return '<div class="right-section"><div class="right-section-title">Related</div><div class="ref-lookup-message">No related entries available.</div></div>';
+  }
+
   let html = '';
-  html += renderReverseLookupSection();
+  if (relatedEntries.length > 0) {
+    html += '<div class="right-section">';
+    html += `<div class="right-section-title">Semantic Related Entries (${relatedEntries.length})</div>`;
+    html += '<div class="right-related-list">';
+    for (const related of relatedEntries.slice(0, 20)) {
+      const matchedRefs = Array.isArray(related.matchedRefs) ? related.matchedRefs : [];
+      html += `<button class="right-related-item" type="button" data-book="${escHtml(related.book)}" data-key="${escHtml(related.key)}">`;
+      html += `<span class="right-related-title">${escHtml(related.title)}</span>`;
+      html += `<span class="right-related-meta">${escHtml(BOOK_LABELS[related.book] || related.book)} · ${escHtml(related.key)}</span>`;
+      if (matchedRefs.length > 0) {
+        html += `<span class="right-related-match">Shared refs: ${escHtml(matchedRefs.slice(0, 3).join('; '))}</span>`;
+      }
+      html += '</button>';
+    }
+    html += '</div></div>';
+  }
 
-  // Language sets
+  if (crossRefs.length > 0) {
+    html += `<div class="right-section">`;
+    html += `<div class="right-section-title">Cross References</div>`;
+    for (const target of crossRefs) {
+      const targetEntry = resolveTarget(target);
+      const label = targetEntry ? targetEntry.title : target;
+      html += `<a class="right-crossref-item" data-target="${escHtml(target)}">${escHtml(label)}</a>`;
+    }
+    html += `</div>`;
+  }
+
+  return html;
+}
+
+function getRightPanelTabs(entry) {
+  const tabs = [
+    { id: 'details', label: 'Details' },
+    { id: 'lookup', label: 'Lookup' },
+  ];
+  const hasRelated = (entry.relatedEntries && entry.relatedEntries.length > 0) || (entry.crossRefs && entry.crossRefs.length > 0);
+  const hasMeta = (entry.semanticDomains && entry.semanticDomains.length > 0) || (entry.meta && Object.keys(entry.meta).length > 0);
+  if (hasRelated || hasMeta) {
+    tabs.push({ id: 'related', label: 'Related' });
+  }
+  return tabs;
+}
+
+function renderRightDetails(entry) {
+  let html = '';
+
   if (entry.languageSets && entry.languageSets.length > 0) {
     html += `<div class="right-section">`;
     html += `<div class="right-section-title">Original Languages</div>`;
@@ -846,7 +1032,6 @@ function renderRightPanel(entry) {
     html += `</div></div>`;
   }
 
-  // All unique references
   if (entry.references && entry.references.length > 0) {
     html += `<div class="right-section">`;
     html += `<div class="right-section-title">Scripture References (${entry.references.length})</div>`;
@@ -857,20 +1042,33 @@ function renderRightPanel(entry) {
     html += `</div></div>`;
   }
 
-  // Cross references
-  if (entry.crossRefs && entry.crossRefs.length > 0) {
-    html += `<div class="right-section">`;
-    html += `<div class="right-section-title">Cross References</div>`;
-    for (const target of entry.crossRefs) {
-      // Try to resolve the target to a title
-      const targetEntry = resolveTarget(target);
-      const label = targetEntry ? targetEntry.title : target;
-      html += `<a class="right-crossref-item" data-target="${escHtml(target)}">${escHtml(label)}</a>`;
-    }
-    html += `</div>`;
+  html += renderMetadataSection(entry);
+  return html;
+}
+
+// ── Right panel rendering ─────────────────────────────────────────
+
+function renderRightPanel(entry) {
+  const tabs = getRightPanelTabs(entry);
+  if (!tabs.some(tab => tab.id === rightPanelTab)) {
+    rightPanelTab = 'details';
   }
 
-  // Attribution
+  let html = '<div class="right-tabbar">';
+  for (const tab of tabs) {
+    const active = rightPanelTab === tab.id ? ' active' : '';
+    html += `<button class="right-tab-btn${active}" data-tab="${tab.id}" type="button">${escHtml(tab.label)}</button>`;
+  }
+  html += '</div>';
+
+  if (rightPanelTab === 'lookup') {
+    html += renderReverseLookupSection();
+  } else if (rightPanelTab === 'related') {
+    html += renderRelatedEntriesSection(entry);
+  } else {
+    html += renderRightDetails(entry);
+  }
+
   html += `<div class="right-attribution">`;
   html += `© United Bible Societies, 2025.<br>`;
   html += `<a href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a><br>`;
@@ -879,6 +1077,15 @@ function renderRightPanel(entry) {
 
   $rightContent.innerHTML = html;
 
+  $rightContent.querySelectorAll('.right-tab-btn').forEach(el => {
+    el.addEventListener('click', () => {
+      const nextTab = el.dataset.tab;
+      if (!nextTab || nextTab === rightPanelTab) return;
+      rightPanelTab = nextTab;
+      renderRightPanel(entry);
+    });
+  });
+
   const lookupForm = $rightContent.querySelector('.ref-lookup-form');
   if (lookupForm) {
     lookupForm.addEventListener('submit', (event) => {
@@ -886,6 +1093,7 @@ function renderRightPanel(entry) {
       const input = lookupForm.querySelector('.ref-lookup-input');
       const query = input ? input.value : '';
       performReferenceLookup(query);
+      rightPanelTab = 'lookup';
       renderRightPanel(entry);
       fetchLookupVerseText(query);
     });
@@ -896,6 +1104,7 @@ function renderRightPanel(entry) {
       const reference = (el.dataset.reference || '').trim();
       if (!reference) return;
       performReferenceLookup(reference);
+      rightPanelTab = 'lookup';
       renderRightPanel(entry);
       fetchLookupVerseText(reference);
     });
@@ -906,10 +1115,28 @@ function renderRightPanel(entry) {
       const book = el.dataset.book;
       const key = el.dataset.key;
       if (!book || !key) return;
-      if (book !== currentBook) {
+      if (_bookLoadState[book] !== 'loaded') {
         switchBook(book);
+        loadBookData(book).then(() => selectEntry(key));
+      } else {
+        if (book !== currentBook) switchBook(book);
+        selectEntry(key);
       }
-      selectEntry(key);
+    });
+  });
+
+  $rightContent.querySelectorAll('.right-related-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const book = el.dataset.book;
+      const key = el.dataset.key;
+      if (!book || !key) return;
+      if (_bookLoadState[book] !== 'loaded') {
+        switchBook(book);
+        loadBookData(book).then(() => selectEntry(key));
+      } else {
+        if (book !== currentBook) switchBook(book);
+        selectEntry(key);
+      }
     });
   });
 
@@ -921,7 +1148,7 @@ function renderRightPanel(entry) {
 
 function resolveTarget(target) {
   // Target format: "FAUNA:2.13"
-  const match = target.match(/^(FAUNA|FLORA|REALIA):(.+)$/i);
+  const match = target.match(/^(FAUNA|FLORA|REALIA|GREEK|HEBREW):(.+)$/i);
   if (match) {
     const book = match[1].toLowerCase();
     const key = match[2];
@@ -1287,9 +1514,21 @@ function handleHash() {
   if (parts.length >= 2) {
     const book = parts[0];
     const key = parts.slice(1).join('/');
-    if (DICTIONARY_DATA[book]) {
-      launchApp(book);
-      selectEntry(key);
+    if (book in BOOK_LABELS) {
+      $landing.classList.remove('active');
+      $app.classList.add('active');
+      // For lazy books, load then select
+      if (_bookLoadState[book] !== 'loaded') {
+        switchBook(book); // shows loading spinner
+        loadBookData(book).then(() => {
+          if (currentBook !== book) return;
+          renderEntryList();
+          selectEntry(key);
+        });
+      } else {
+        launchApp(book);
+        selectEntry(key);
+      }
       return true;
     }
   }
