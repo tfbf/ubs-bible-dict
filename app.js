@@ -18,11 +18,44 @@ const BOOK_ICONS  = { fauna: '🦁', flora: '🌿', realia: '⚒️', greek: 'Α
 const ENTRY_BOOK_POSITION = { fauna: 0, flora: 1, realia: 2, greek: 3, hebrew: 4 };
 let rightPanelTab = 'details';
 let lexiconSortMode = localStorage.getItem('lexiconSortMode') || 'alpha';
+let accordionMode = localStorage.getItem('accordionMode') === 'true';
+let openDomains = new Set(JSON.parse(localStorage.getItem('openDomains') || '[]'));
+
+// ── DOM references ────────────────────────────────────────────────
+const $landing       = document.getElementById('landing');
+const $app           = document.getElementById('app');
+const $entryList     = document.getElementById('entryList');
+const $entryContent  = document.getElementById('entryContent');
+const $rightContent  = document.getElementById('rightContent');
+const $searchInput   = document.getElementById('searchInput');
+const $navFilter     = document.getElementById('navFilter');
+const $navTitle      = document.getElementById('navTitle');
+const $entryCount    = document.getElementById('entryCount');
+const $leftPanel     = document.getElementById('leftPanel');
+const $rightPanel    = document.getElementById('rightPanel');
+const $middlePanel   = document.getElementById('middlePanel');
+const $lexSortBar    = document.getElementById('lexSortBar');
 
 function setLexiconSort(mode) {
   lexiconSortMode = mode;
   localStorage.setItem('lexiconSortMode', mode);
   updateLexiconSortUI();
+  renderEntryList($navFilter.value);
+}
+
+function toggleAccordionMode(enabled) {
+  accordionMode = enabled;
+  localStorage.setItem('accordionMode', enabled);
+  renderEntryList($navFilter.value);
+}
+
+function toggleDomain(domainName) {
+  if (openDomains.has(domainName)) {
+    openDomains.delete(domainName);
+  } else {
+    openDomains.add(domainName);
+  }
+  localStorage.setItem('openDomains', JSON.stringify(Array.from(openDomains)));
   renderEntryList($navFilter.value);
 }
 
@@ -33,6 +66,13 @@ function updateLexiconSortUI() {
     const btn = document.getElementById(`sort-${m}`);
     if (btn) btn.classList.toggle('active', lexiconSortMode === m);
   });
+
+  const accToggle = document.getElementById('domainAccordionToggle');
+  if (accToggle) {
+    accToggle.style.display = (lexiconSortMode === 'domain') ? 'flex' : 'none';
+  }
+  const accCheckbox = document.getElementById('accordionModeCheckbox');
+  if (accCheckbox) accCheckbox.checked = accordionMode;
 }
 
 // Parse <strong>Label:</strong> value paragraphs into a fields map
@@ -113,21 +153,6 @@ const reverseLookupState = {
   verseError: '',
   verseTexts: [],
 };
-
-// ── DOM references ────────────────────────────────────────────────
-const $landing       = document.getElementById('landing');
-const $app           = document.getElementById('app');
-const $entryList     = document.getElementById('entryList');
-const $entryContent  = document.getElementById('entryContent');
-const $rightContent  = document.getElementById('rightContent');
-const $searchInput   = document.getElementById('searchInput');
-const $navFilter     = document.getElementById('navFilter');
-const $navTitle      = document.getElementById('navTitle');
-const $entryCount    = document.getElementById('entryCount');
-const $leftPanel     = document.getElementById('leftPanel');
-const $rightPanel    = document.getElementById('rightPanel');
-const $middlePanel   = document.getElementById('middlePanel');
-const $lexSortBar    = document.getElementById('lexSortBar');
 
 // ── Search results container ──────────────────────────────────────
 const $searchResults = document.createElement('div');
@@ -448,6 +473,8 @@ function renderEntryList(filter = '') {
   });
 
   let html = '';
+  let lastDomain = null;
+  let inGroup = false;
 
   if (isLexicon) {
     // Sort
@@ -467,7 +494,6 @@ function renderEntryList(filter = '') {
     }
   }
 
-  let lastDomain = null;
   for (const entry of entries) {
     const depth = isLexicon ? 0 : Math.min(entry.depth, 3);
     const active = entry.key === currentEntryKey ? ' active' : '';
@@ -476,8 +502,20 @@ function renderEntryList(filter = '') {
     if (isLexicon && lexiconSortMode === 'domain') {
       const dom = getLexiconDomainLabel(entry) || '(Unclassified)';
       if (dom !== lastDomain) {
-        html += `<div class="lex-domain-header">${escHtml(dom)}</div>`;
+        if (inGroup) {
+          html += `</div>`; // Close previous group
+        }
+        
+        const isOpen = !accordionMode || openDomains.has(dom);
+        const accordionClass = accordionMode ? ' is-accordion' : '';
+        const openClass = isOpen ? ' is-open' : '';
+        const onclick = accordionMode ? ` onclick="toggleDomain('${escJs(dom)}'); event.stopPropagation();"` : '';
+        
+        html += `<button class="lex-domain-header${accordionClass}${openClass}"${onclick}>${escHtml(dom)}</button>`;
+        html += `<div class="lex-domain-group${isOpen ? '' : ' is-collapsed'}">`;
+        
         lastDomain = dom;
+        inGroup = true;
       }
     }
 
@@ -497,6 +535,10 @@ function renderEntryList(filter = '') {
     }
 
     html += `${escHtml(entry.title)}</button>`;
+  }
+
+  if (inGroup) {
+    html += `</div>`;
   }
 
   $entryList.innerHTML = html;

@@ -429,12 +429,58 @@ img { max-width: 100%; display: block; }
 /* Lexicon sort bar */
 .lex-sort-bar {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
   padding: 8px var(--panel-pad);
   background: var(--c-surface);
   border-bottom: 1px solid var(--c-border-light);
   flex-shrink: 0;
 }
+.lex-sort-btns {
+  display: flex;
+  gap: 6px;
+}
+.lex-accordion-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--c-border-light);
+}
+.toggle-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  letter-spacing: 0.05em;
+}
+
+/* Toggle Switch Component */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--c-border);
+  transition: .2s;
+  border-radius: 16px;
+}
+.toggle-slider:before {
+  position: absolute; content: "";
+  height: 12px; width: 12px;
+  left: 2px; bottom: 2px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+}
+input:checked + .toggle-slider { background-color: var(--c-accent); }
+input:checked + .toggle-slider:before { transform: translateX(12px); }
+
 .lex-sort-btn {
   flex: 1;
   padding: 3px 8px;
@@ -461,7 +507,11 @@ img { max-width: 100%; display: block; }
 
 /* Domain group header in lexicon list */
 .lex-domain-header {
-  padding: 6px var(--panel-pad) 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px var(--panel-pad);
   font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -469,10 +519,41 @@ img { max-width: 100%; display: block; }
   color: var(--c-text-muted);
   background: var(--c-surface);
   border-top: 1px solid var(--c-border-light);
-  margin-top: 4px;
+  border-bottom: 1px solid var(--c-border-light);
   position: sticky;
-  top: 37px;
-  z-index: 1;
+  top: -4px;
+  z-index: 10;
+  text-align: left;
+}
+
+.lex-domain-header.is-accordion {
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+.lex-domain-header.is-accordion:hover {
+  background: var(--c-surface-alt);
+  color: var(--c-text);
+}
+.lex-domain-header.is-accordion::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-left: 8px;
+  transition: transform var(--t-fast);
+}
+.lex-domain-header.is-accordion.is-open::after {
+  transform: rotate(-135deg);
+}
+
+.lex-domain-group {
+  display: block;
+}
+.lex-domain-group.is-collapsed {
+  display: none;
 }
 
 /* Middle panel */
