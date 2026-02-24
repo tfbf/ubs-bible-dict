@@ -7,6 +7,11 @@ let currentBook = 'fauna';
 let currentEntryKey = null;
 let searchTimeout = null;
 let mobilePanel = 'middle';  // which panel is visible on mobile
+const SOURCE_TERM_MODES = ['original', 'translit', 'both'];
+let sourceTermMode = localStorage.getItem('sourceTermMode') || 'both';
+if (!SOURCE_TERM_MODES.includes(sourceTermMode)) {
+  sourceTermMode = 'both';
+}
 
 const BOOK_LABELS = { fauna: 'Fauna', flora: 'Flora', realia: 'Realia' };
 const BOOK_ICONS  = { fauna: '🦁', flora: '🌿', realia: '⚒️' };
@@ -32,9 +37,35 @@ document.getElementById('app').appendChild($searchResults);
 
 // ── Build flat lookup + search index ──────────────────────────────
 const entryMap = {};  // "fauna:1.1" → entry object
+const lemmaIndex = {}; // "language|normalizedTerm" -> [{book,key,title}]
+
+function addLemmaIndex(language, term, entry) {
+  const normalized = normalizeTermForIndex(term);
+  if (!normalized) return;
+  const lang = (language || '').toLowerCase().trim() || 'unknown';
+  const langKey = `${lang}|${normalized}`;
+  const anyKey = `*|${normalized}`;
+  const payload = { book: entry.book, key: entry.key, title: entry.title };
+
+  if (!lemmaIndex[langKey]) lemmaIndex[langKey] = [];
+  if (!lemmaIndex[anyKey]) lemmaIndex[anyKey] = [];
+
+  if (!lemmaIndex[langKey].some(v => v.book === payload.book && v.key === payload.key)) {
+    lemmaIndex[langKey].push(payload);
+  }
+  if (!lemmaIndex[anyKey].some(v => v.book === payload.book && v.key === payload.key)) {
+    lemmaIndex[anyKey].push(payload);
+  }
+}
+
 for (const [book, entries] of Object.entries(DICTIONARY_DATA)) {
   for (const entry of entries) {
     entryMap[`${book}:${entry.key}`] = entry;
+
+    for (const ls of (entry.languageSets || [])) {
+      addLemmaIndex(ls.language, ls.lemma, entry);
+      addLemmaIndex(ls.language, ls.transliteration, entry);
+    }
 
     // Pre-compute searchText lazily on first access
     Object.defineProperty(entry, 'searchText', {
@@ -187,8 +218,12 @@ function navigateTo(target) {
 
 // ── Entry content rendering ───────────────────────────────────────
 
-function renderEntry(entry) {
+function renderEntry(entry, options = {}) {
+  const resetScroll = options.resetScroll !== false;
   let html = '';
+
+  const visibleSections = (entry.sections || []).filter(sec => !isReferencesSection(sec));
+  const compactTerms = buildCompactTerms(entry.languageSets || []);
 
   // Title block
   html += `<div class="entry-title-block">`;
@@ -199,6 +234,44 @@ function renderEntry(entry) {
     html += `<div class="entry-breadcrumb">${escHtml(entry.book.toUpperCase())} § ${escHtml(entry.key)}</div>`;
   }
   html += `</div>`;
+
+  // Compact terms strip (instead of bulky References section)
+  if (compactTerms.length > 0) {
+    const modeLabel = sourceTermMode === 'original' ? 'Original' : sourceTermMode === 'translit' ? 'Translit' : 'Both';
+    html += `<div class="entry-term-strip">`;
+    html += `<div class="entry-term-strip-head">`;
+    html += `<div class="entry-term-strip-label">Source Terms</div>`;
+    html += `<div class="entry-term-control">`;
+    html += `<span class="entry-term-control-text">Script</span>`;
+    html += `<select class="entry-term-select" aria-label="Source term script mode">`;
+    html += `<option value="original"${sourceTermMode === 'original' ? ' selected' : ''}>Original</option>`;
+    html += `<option value="translit"${sourceTermMode === 'translit' ? ' selected' : ''}>Translit</option>`;
+    html += `<option value="both"${sourceTermMode === 'both' ? ' selected' : ''}>Both</option>`;
+    html += `</select>`;
+    html += `</div></div>`;
+    for (const group of compactTerms) {
+      html += `<div class="entry-term-group">`;
+      html += `<span class="entry-term-lang">${escHtml(group.language)}</span>`;
+      for (const item of group.items) {
+        const lemma = (item.lemma || '').trim();
+        const translit = (item.transliteration || '').trim();
+
+        if (sourceTermMode === 'both' && lemma && translit && normalizeTermForIndex(lemma) !== normalizeTermForIndex(translit)) {
+          html += `<button class="entry-term-chip" data-language="${escHtml(group.language)}" data-lemma="${escHtml(lemma)}" data-translit="${escHtml(translit)}" data-prefer="lemma" title="Open related entry">${escHtml(lemma)}</button>`;
+          html += `<button class="entry-term-chip is-translit" data-language="${escHtml(group.language)}" data-lemma="${escHtml(lemma)}" data-translit="${escHtml(translit)}" data-prefer="translit" title="Open related entry">${escHtml(translit)}</button>`;
+          continue;
+        }
+
+        const label = getSourceTermLabel(item, sourceTermMode);
+        if (!label) continue;
+        const prefer = sourceTermMode === 'translit' ? 'translit' : 'lemma';
+        const translitClass = sourceTermMode === 'translit' ? ' is-translit' : '';
+        html += `<button class="entry-term-chip${translitClass}" data-language="${escHtml(group.language)}" data-lemma="${escHtml(lemma)}" data-translit="${escHtml(translit)}" data-prefer="${prefer}" title="Open related entry">${escHtml(label)}</button>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
 
   // Index (sub-entries)
   if (entry.indexItems && entry.indexItems.length > 0) {
@@ -212,7 +285,7 @@ function renderEntry(entry) {
   }
 
   // Sections
-  for (const sec of entry.sections) {
+  for (const sec of visibleSections) {
     html += `<div class="entry-section">`;
 
     // Section heading
@@ -248,13 +321,44 @@ function renderEntry(entry) {
 
   $entryContent.innerHTML = html;
 
-  // Scroll to top
-  $middlePanel.scrollTop = 0;
+  if (resetScroll) {
+    $middlePanel.scrollTop = 0;
+  }
 
   // Attach cross-ref click handlers
   $entryContent.querySelectorAll('.cross-ref').forEach(el => {
     el.addEventListener('click', () => navigateTo(el.dataset.target));
   });
+
+  $entryContent.querySelectorAll('.entry-term-chip').forEach(el => {
+    el.addEventListener('click', () => {
+      const lemma = el.dataset.lemma || '';
+      const translit = el.dataset.translit || '';
+      const language = el.dataset.language || '';
+      const prefer = el.dataset.prefer || (sourceTermMode === 'translit' ? 'translit' : 'lemma');
+      const primary = prefer === 'translit' ? translit : lemma;
+      const secondary = prefer === 'translit' ? lemma : translit;
+      const target = findLinkedEntryForTerm(primary, language, entry) || findLinkedEntryForTerm(secondary, language, entry);
+      if (!target) return;
+      if (target.book !== currentBook) {
+        switchBook(target.book);
+      }
+      selectEntry(target.key);
+    });
+  });
+
+  const modeSelect = $entryContent.querySelector('.entry-term-select');
+  if (modeSelect) {
+    modeSelect.addEventListener('change', () => {
+      const mode = modeSelect.value;
+      if (!SOURCE_TERM_MODES.includes(mode)) return;
+      if (mode !== sourceTermMode) {
+        sourceTermMode = mode;
+        localStorage.setItem('sourceTermMode', sourceTermMode);
+        renderEntry(entry, { resetScroll: false });
+      }
+    });
+  }
 
   document.title = `${entry.title} — ${BOOK_LABELS[entry.book]} — Bible Reference`;
 }
@@ -393,6 +497,84 @@ function normalizeStrongsId(strongsId) {
   if (!match) return '';
   const [, prefix, digits] = match;
   return `${prefix}${parseInt(digits, 10).toString().padStart(4, '0')}`;
+}
+
+function normalizeTermForIndex(term) {
+  if (!term) return '';
+  return term.toString().trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function isReferencesSection(sec) {
+  if (!sec) return false;
+  const contentType = (sec.contentType || '').toLowerCase();
+  const headingRaw = (sec.heading || sec.headingHtml || '').toString();
+  const headingText = headingRaw.replace(/<[^>]+>/g, '').trim().toLowerCase();
+  return contentType === 'references' || headingText === 'references:' || headingText === 'references';
+}
+
+function buildCompactTerms(languageSets) {
+  const groups = new Map();
+  for (const ls of (languageSets || [])) {
+    const language = (ls.language || 'Other').trim() || 'Other';
+    const lemma = (ls.lemma || '').trim();
+    const transliteration = (ls.transliteration || '').trim();
+    const lemmaNorm = normalizeTermForIndex(lemma);
+    const translitNorm = normalizeTermForIndex(transliteration);
+    if (!lemmaNorm && !translitNorm) continue;
+
+    if (!groups.has(language)) groups.set(language, new Map());
+    const map = groups.get(language);
+    const key = `${lemmaNorm}|${translitNorm}`;
+    if (!map.has(key)) {
+      map.set(key, { lemma, transliteration });
+    }
+  }
+
+  return Array.from(groups.entries()).map(([language, termMap]) => ({
+    language,
+    items: Array.from(termMap.values()).slice(0, 12),
+  })).filter(group => group.items.length > 0);
+}
+
+function getSourceTermLabel(item, mode) {
+  const lemma = (item.lemma || '').trim();
+  const translit = (item.transliteration || '').trim();
+  if (mode === 'original') {
+    return lemma || translit;
+  }
+  if (mode === 'translit') {
+    return translit || lemma;
+  }
+  if (lemma && translit && normalizeTermForIndex(lemma) !== normalizeTermForIndex(translit)) {
+    return `${lemma} · ${translit}`;
+  }
+  return lemma || translit;
+}
+
+function findLinkedEntryForTerm(term, language, currentEntry) {
+  const normalized = normalizeTermForIndex(term);
+  if (!normalized) return null;
+
+  const langKey = `${(language || '').toLowerCase().trim()}|${normalized}`;
+  const anyKey = `*|${normalized}`;
+
+  const candidates = [
+    ...(lemmaIndex[langKey] || []),
+    ...(lemmaIndex[anyKey] || []),
+  ];
+
+  const unique = [];
+  for (const c of candidates) {
+    if (!unique.some(v => v.book === c.book && v.key === c.key)) {
+      unique.push(c);
+    }
+  }
+
+  const preferred = unique.find(c => c.book === currentBook && !(c.book === currentEntry.book && c.key === currentEntry.key))
+    || unique.find(c => !(c.book === currentEntry.book && c.key === currentEntry.key))
+    || null;
+
+  return preferred;
 }
 
 function collectEntryStrongs(entry) {

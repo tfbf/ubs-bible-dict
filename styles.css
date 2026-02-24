@@ -467,6 +467,107 @@ img { max-width: 100%; display: block; }
 .entry-book-badge.flora { background: #E8F5F1; color: var(--c-flora); }
 .entry-book-badge.realia { background: #F5EDE5; color: var(--c-realia); }
 
+.entry-term-strip {
+  margin-bottom: 20px;
+  padding: 10px 12px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-light);
+  border-radius: var(--r-sm);
+}
+
+.entry-term-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.entry-term-strip-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c-text-muted);
+}
+
+.entry-term-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.entry-term-control-text {
+  font-size: 0.68rem;
+  color: var(--c-text-muted);
+}
+
+.entry-term-select {
+  height: 24px;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  background: var(--c-bg);
+  color: var(--c-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0 6px;
+}
+
+.entry-term-select:focus {
+  outline: none;
+  border-color: var(--c-accent-light);
+  box-shadow: 0 0 0 2px var(--c-accent-bg);
+}
+
+.entry-term-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.entry-term-group:last-child {
+  margin-bottom: 0;
+}
+
+.entry-term-lang {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--c-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 2px;
+}
+
+.entry-term-chip {
+  font-size: 0.76rem;
+  line-height: 1.2;
+  color: var(--c-accent);
+  background: var(--c-accent-bg);
+  border: 1px solid var(--c-border-light);
+  border-radius: 999px;
+  padding: 3px 8px;
+  transition: all var(--t-fast);
+}
+
+.entry-term-chip:hover {
+  color: var(--c-accent-hover);
+  border-color: var(--c-accent-light);
+  transform: translateY(-1px);
+}
+
+.entry-term-chip.is-translit {
+  color: #2F5C72;
+  background: #EEF5F8;
+  border-color: #D6E6EE;
+}
+
+.entry-term-chip.is-translit:hover {
+  color: #254B5D;
+  border-color: #BFD8E4;
+}
+
 /* Index within entry */
 .entry-index {
   margin-bottom: 28px;
