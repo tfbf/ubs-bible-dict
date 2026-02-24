@@ -639,10 +639,7 @@ function navigateTo(target) {
       // Lemma-based lookup: "lemma:μαρτυρέω"
       if (rest.startsWith('lemma:')) {
         const lemma = rest.slice(6);
-        const normalized = normalizeTermForIndex(lemma);
-        const langKey = `${book}|${normalized}`;
-        const hits = lemmaIndex[langKey] || lemmaIndex[`*|${normalized}`] || [];
-        const hit = hits.find(h => h.book === book) || hits[0];
+        const hit = resolveLemmaHit(book, lemma);
         if (hit) selectEntry(hit.key);
         return;
       }
@@ -672,10 +669,7 @@ async function resolveEntryFromTarget(target) {
 
   if (rest.startsWith('lemma:')) {
     const lemma = rest.slice(6);
-    const normalized = normalizeTermForIndex(lemma);
-    const langKey = `${book}|${normalized}`;
-    const hits = lemmaIndex[langKey] || lemmaIndex[`*|${normalized}`] || [];
-    const hit = hits.find(h => h.book === book) || hits[0];
+    const hit = resolveLemmaHit(book, lemma);
     if (!hit) return null;
     return entryMap[`${hit.book}:${hit.key}`] || null;
   }
@@ -1851,7 +1845,39 @@ function normalizeStrongsId(strongsId) {
 
 function normalizeTermForIndex(term) {
   if (!term) return '';
-  return term.toString().trim().toLowerCase().replace(/\s+/g, ' ');
+  return term
+    .toString()
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .replace(/[\u200e\u200f\u202a-\u202e]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function resolveLemmaHit(book, lemma) {
+  const normalized = normalizeTermForIndex(lemma);
+  if (!normalized) return null;
+
+  const langKey = `${book}|${normalized}`;
+  const hits = lemmaIndex[langKey] || lemmaIndex[`*|${normalized}`] || [];
+  const indexedHit = hits.find(h => h.book === book) || hits[0];
+  if (indexedHit) return indexedHit;
+
+  const entries = DICTIONARY_DATA[book] || [];
+  const entryByTitle = entries.find(e => normalizeTermForIndex(e.title) === normalized);
+  if (entryByTitle) {
+    return { book, key: entryByTitle.key, title: entryByTitle.title };
+  }
+
+  const entryByLanguageSet = entries.find(e => (e.languageSets || []).some(ls => {
+    return normalizeTermForIndex(ls.lemma) === normalized || normalizeTermForIndex(ls.transliteration) === normalized;
+  }));
+  if (entryByLanguageSet) {
+    return { book, key: entryByLanguageSet.key, title: entryByLanguageSet.title };
+  }
+
+  return null;
 }
 
 function isReferencesSection(sec) {
