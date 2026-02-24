@@ -996,6 +996,16 @@ input:checked + .toggle-slider:before { transform: translateX(12px); }
 }
 .cross-ref:hover { color: var(--c-accent-hover); }
 
+.domain-link {
+  font-family: var(--f-mono);
+  font-size: 0.78rem;
+  color: var(--c-text-muted);
+  background: var(--c-surface-alt);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--c-border-light);
+}
+
 .image-placeholder {
   display: inline-block;
   font-size: 0.8rem;

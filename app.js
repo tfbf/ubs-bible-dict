@@ -576,17 +576,32 @@ function selectEntry(key) {
 
 // Navigate to a cross-reference (possibly in another book)
 function navigateTo(target) {
-  // Target format: "FAUNA:2.13" or "GREEK:abc123"
+  // Target format: "FAUNA:2.13", "GREEK:abc123", or "GREEK:lemma:μαρτυρέω"
   const match = target.match(/^(FAUNA|FLORA|REALIA|GREEK|HEBREW):(.+)$/i);
   if (match) {
     const book = match[1].toLowerCase();
-    const key = match[2];
+    const rest = match[2];
+
+    const doNav = () => {
+      // Lemma-based lookup: "lemma:μαρτυρέω"
+      if (rest.startsWith('lemma:')) {
+        const lemma = rest.slice(6);
+        const normalized = normalizeTermForIndex(lemma);
+        const langKey = `${book}|${normalized}`;
+        const hits = lemmaIndex[langKey] || lemmaIndex[`*|${normalized}`] || [];
+        const hit = hits.find(h => h.book === book) || hits[0];
+        if (hit) selectEntry(hit.key);
+        return;
+      }
+      selectEntry(rest);
+    };
+
     if (_bookLoadState[book] !== 'loaded') {
       if (book !== currentBook) switchBook(book);
-      loadBookData(book).then(() => selectEntry(key));
+      loadBookData(book).then(doNav);
     } else {
       if (book !== currentBook) switchBook(book);
-      selectEntry(key);
+      doNav();
     }
   }
 }
@@ -672,14 +687,14 @@ function renderLexiconEntry(entry) {
 
     if (domLabel || subStr) {
       html += `<div class="lex-domain-chips">`;
-      if (domLabel) html += `<span class="lex-domain-chip">${escHtml(domLabel)}</span>`;
-      if (subStr && subStr !== domLabel) html += `<span class="lex-domain-chip lex-chip-sub">${escHtml(subStr)}</span>`;
+      if (domLabel) html += `<span class="lex-domain-chip">${domLabel}</span>`;
+      if (subStr && subStr !== domLabel) html += `<span class="lex-domain-chip lex-chip-sub">${subStr}</span>`;
       html += `</div>`;
     }
 
-    if (glossStr) html += `<div class="lex-glosses">${escHtml(glossStr)}</div>`;
-    if (defStr)   html += `<div class="lex-definition">${escHtml(defStr)}</div>`;
-    if (collocStr) html += `<div class="lex-colloc"><span class="lex-colloc-label">Collocations</span>${escHtml(collocStr)}</div>`;
+    if (glossStr) html += `<div class="lex-glosses">${glossStr}</div>`;
+    if (defStr)   html += `<div class="lex-definition">${defStr}</div>`;
+    if (collocStr) html += `<div class="lex-colloc"><span class="lex-colloc-label">Collocations</span>${collocStr}</div>`;
     if (commentStr) html += `<div class="lex-comment">${commentStr}</div>`;
 
     html += `</div></div>`; // lex-sense-body, lex-sense
@@ -688,6 +703,11 @@ function renderLexiconEntry(entry) {
   $entryContent.innerHTML = html;
   $middlePanel.scrollTop = 0;
   document.title = `${entry.title} — ${BOOK_LABELS[entry.book]} — Bible Reference`;
+
+  // Attach click handlers for cross-ref links generated from {L:...} codes
+  $entryContent.querySelectorAll('.cross-ref').forEach(el => {
+    el.addEventListener('click', () => navigateTo(el.dataset.target));
+  });
 }
 
 // ── Entry content rendering ───────────────────────────────────────
