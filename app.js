@@ -605,20 +605,6 @@ function renderLexiconEntry(entry) {
     if (pos && !posLabels.includes(pos)) posLabels.push(pos);
   }
 
-  let html = '';
-  html += `<div class="entry-title-block">`;
-  html += `<h1><span class="lex-lemma">${escHtml(entry.title)}</span>`;
-  html += `<span class="entry-book-badge ${entry.book}">${BOOK_LABELS[entry.book]}</span>`;
-  html += `</h1>`;
-  if (posLabels.length > 0) {
-    html += `<div class="lex-pos-row">`;
-    for (const pos of posLabels) {
-      html += `<span class="lex-pos-badge">${escHtml(pos)}</span>`;
-    }
-    html += `</div>`;
-  }
-  html += `</div>`;
-
   // Inflections — collect from all base forms, deduplicate
   const inflections = [];
   for (const bf of baseFormSections) {
@@ -626,6 +612,33 @@ function renderLexiconEntry(entry) {
     const infl = Array.isArray(f['Inflections']) ? f['Inflections'][0] : f['Inflections'];
     if (infl && !inflections.includes(infl)) inflections.push(infl);
   }
+
+  // Get transliteration from first language set if present
+  let translit = '';
+  const firstLs = (entry.languageSets || [])[0];
+  if (firstLs && firstLs.transliteration) {
+    translit = firstLs.transliteration;
+  }
+
+  let html = '';
+  html += `<div class="lex-entry-header">`;
+  html += `<div class="lex-title-row">`;
+  html += `<h1><span class="lex-lemma">${escHtml(entry.title)}</span>`;
+  if (translit) {
+    html += `<span class="lex-translit">${escHtml(translit)}</span>`;
+  }
+  html += `<span class="entry-book-badge ${entry.book}">${BOOK_LABELS[entry.book]}</span>`;
+  html += `</h1>`;
+  html += `</div>`; // lex-title-row
+
+  if (posLabels.length > 0) {
+    html += `<div class="lex-pos-row">`;
+    for (const pos of posLabels) {
+      html += `<span class="lex-pos-badge">${escHtml(pos)}</span>`;
+    }
+    html += `</div>`;
+  }
+
   if (inflections.length > 0) {
     html += `<div class="lex-inflections">`;
     html += `<span class="lex-inflections-label">Inflections</span>`;
@@ -636,6 +649,7 @@ function renderLexiconEntry(entry) {
     html += `<span class="lex-inflections-val">${renderedInfls}</span>`;
     html += `</div>`;
   }
+  html += `</div>`; // lex-entry-header
 
   // Senses
   const hasMultipleSenses = senseSections.length > 1;

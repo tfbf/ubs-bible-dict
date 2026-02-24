@@ -559,14 +559,19 @@ input:checked + .toggle-slider:before { transform: translateX(12px); }
 /* Middle panel */
 .panel-middle {
   flex: 1;
-  background: var(--c-bg);
+  background: var(--c-surface);
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 .panel-middle::-webkit-scrollbar { width: 8px; }
 .panel-middle::-webkit-scrollbar-track { background: transparent; }
 .panel-middle::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 4px; }
 
-.entry-content { padding: 32px; max-width: 780px; margin: 0 auto; }
+.entry-content { 
+  padding: 40px 60px; 
+  max-width: 900px; 
+  margin: 0; /* Align to left for layout stability */
+}
 
 .empty-state {
   text-align: center;
@@ -633,9 +638,42 @@ input:checked + .toggle-slider:before { transform: translateX(12px); }
 /* ═══════════════════════════════════════════════════════════════
    LEXICON ENTRY (Greek / Hebrew)
    ═══════════════════════════════════════════════════════════════ */
+
+.lex-entry-header {
+  border-bottom: 2px solid var(--c-border-light);
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lex-title-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.lex-title-row h1 {
+  margin-bottom: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
 .lex-lemma {
   font-family: var(--f-serif);
-  font-size: 1.9rem;
+  font-size: 2.1rem;
+}
+
+.lex-translit {
+  font-family: var(--f-sans);
+  font-size: 1.15rem;
+  font-weight: 400;
+  color: var(--c-text-secondary);
+  font-style: italic;
+  letter-spacing: 0.01em;
 }
 
 /* Part of speech row */
@@ -643,8 +681,8 @@ input:checked + .toggle-slider:before { transform: translateX(12px); }
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 6px;
-  margin-bottom: 4px;
+  margin-top: 2px;
+  min-height: 24px;
 }
 .lex-pos-badge {
   display: inline-block;
