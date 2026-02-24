@@ -22,7 +22,17 @@ let lexiconSortMode = localStorage.getItem('lexiconSortMode') || 'alpha';
 function setLexiconSort(mode) {
   lexiconSortMode = mode;
   localStorage.setItem('lexiconSortMode', mode);
+  updateLexiconSortUI();
   renderEntryList($navFilter.value);
+}
+
+function updateLexiconSortUI() {
+  if (!$lexSortBar) return;
+  const modes = ['alpha', 'strongs', 'domain'];
+  modes.forEach(m => {
+    const btn = document.getElementById(`sort-${m}`);
+    if (btn) btn.classList.toggle('active', lexiconSortMode === m);
+  });
 }
 
 // Parse <strong>Label:</strong> value paragraphs into a fields map
@@ -117,6 +127,7 @@ const $entryCount    = document.getElementById('entryCount');
 const $leftPanel     = document.getElementById('leftPanel');
 const $rightPanel    = document.getElementById('rightPanel');
 const $middlePanel   = document.getElementById('middlePanel');
+const $lexSortBar    = document.getElementById('lexSortBar');
 
 // ── Search results container ──────────────────────────────────────
 const $searchResults = document.createElement('div');
@@ -361,6 +372,12 @@ function switchBook(book) {
   currentBook = book;
   currentEntryKey = null;
 
+  const isLexicon = (book === 'greek' || book === 'hebrew');
+  if ($lexSortBar) {
+    $lexSortBar.style.display = isLexicon ? 'flex' : 'none';
+    if (isLexicon) updateLexiconSortUI();
+  }
+
   // Update header tabs
   document.querySelectorAll('.book-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.book === book);
@@ -433,13 +450,6 @@ function renderEntryList(filter = '') {
   let html = '';
 
   if (isLexicon) {
-    // Sort controls
-    html += `<div class="lex-sort-bar">`;
-    html += `<button class="lex-sort-btn${lexiconSortMode === 'alpha' ? ' active' : ''}" onclick="setLexiconSort('alpha')" title="Sort alphabetically">A–Z</button>`;
-    html += `<button class="lex-sort-btn${lexiconSortMode === 'strongs' ? ' active' : ''}" onclick="setLexiconSort('strongs')" title="Sort by Strong's number">#</button>`;
-    html += `<button class="lex-sort-btn${lexiconSortMode === 'domain' ? ' active' : ''}" onclick="setLexiconSort('domain')" title="Group by semantic domain">Domain</button>`;
-    html += `</div>`;
-
     // Sort
     if (lexiconSortMode === 'strongs') {
       entries = [...entries].sort((a, b) => {

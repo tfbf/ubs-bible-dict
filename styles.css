@@ -428,33 +428,35 @@ img { max-width: 100%; display: block; }
 
 /* Lexicon sort bar */
 .lex-sort-bar {
-  position: sticky;
-  top: 0;
-  z-index: 2;
   display: flex;
-  gap: 4px;
-  padding: 6px var(--panel-pad);
-  background: var(--c-bg-secondary);
+  gap: 6px;
+  padding: 8px var(--panel-pad);
+  background: var(--c-surface);
   border-bottom: 1px solid var(--c-border-light);
+  flex-shrink: 0;
 }
 .lex-sort-btn {
   flex: 1;
-  padding: 4px 6px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  border-radius: var(--r-sm);
-  background: var(--c-surface);
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  border-radius: var(--r-full);
+  background: var(--c-surface-alt);
   color: var(--c-text-secondary);
-  border: 1px solid var(--c-border-light);
+  border: 1px solid transparent;
   cursor: pointer;
   transition: all var(--t-fast);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
-.lex-sort-btn:hover { background: var(--c-surface-alt); color: var(--c-text); }
+.lex-sort-btn:hover {
+  background: var(--c-border-light);
+  color: var(--c-text);
+}
 .lex-sort-btn.active {
   background: var(--c-accent-bg);
   color: var(--c-accent);
   border-color: var(--c-accent-light);
-  font-weight: 600;
 }
 
 /* Domain group header in lexicon list */
