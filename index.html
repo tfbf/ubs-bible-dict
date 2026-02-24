@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bible Flora, Fauna &amp; Realia — A Digital Reference</title>
-  <meta name="description" content="An interactive digital reference for animals, plants, and material objects mentioned in the Bible. Based on UBS Open License resources.">
+  <meta name="description" content="An interactive digital reference for flora, fauna, realia, and Greek/Hebrew lexicons from UBS Open License resources.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -30,32 +30,22 @@
         <div class="hero-badge">UBS Open License Resources</div>
         <h1 class="hero-title">
           Flora, Fauna<br>&amp; Realia
-          <span class="hero-subtitle">of the Bible</span>
+          <span class="hero-subtitle">plus Greek &amp; Hebrew Lexicons</span>
         </h1>
         <p class="hero-description">
           An interactive digital reference for <strong>animals</strong>,
-          <strong>plants</strong>, and <strong>material objects</strong>
-          mentioned in Scripture. Explore the natural and cultural world behind
-          the biblical text with detailed entries, Hebrew &amp; Greek terms,
-          and comprehensive verse references.
+          <strong>plants</strong>, <strong>material objects</strong>, and
+          biblical <strong>Greek/Hebrew lexicons</strong>. Explore Scripture
+          with semantic domains, transliterations, Strong’s links, cross-reference
+          previews, and comprehensive verse references.
         </p>
 
-        <div class="hero-cards">
-          <button class="hero-card" data-book="fauna" onclick="launchApp('fauna')">
-            <span class="card-icon">🦁</span>
-            <span class="card-title">Fauna</span>
-            <span class="card-desc">Animals &amp; creatures of the Bible</span>
-          </button>
-          <button class="hero-card" data-book="flora" onclick="launchApp('flora')">
-            <span class="card-icon">🌿</span>
-            <span class="card-title">Flora</span>
-            <span class="card-desc">Plants &amp; trees of the Bible</span>
-          </button>
-          <button class="hero-card" data-book="realia" onclick="launchApp('realia')">
-            <span class="card-icon">⚒️</span>
-            <span class="card-title">Realia</span>
-            <span class="card-desc">Objects &amp; activities in daily life</span>
-          </button>
+        <div class="hero-book-row" aria-label="Browse dictionaries">
+          <button class="hero-book-btn" data-book="fauna" onclick="launchApp('fauna')">Fauna</button>
+          <button class="hero-book-btn" data-book="flora" onclick="launchApp('flora')">Flora</button>
+          <button class="hero-book-btn" data-book="realia" onclick="launchApp('realia')">Realia</button>
+          <button class="hero-book-btn" data-book="greek" onclick="launchApp('greek')">Greek</button>
+          <button class="hero-book-btn" data-book="hebrew" onclick="launchApp('hebrew')">Hebrew</button>
         </div>
 
         <button class="hero-browse-all" onclick="launchApp('fauna')">
@@ -70,23 +60,23 @@
         <div class="about-grid">
           <div class="about-card">
             <div class="about-icon">📚</div>
-            <h3>Three Handbooks</h3>
+            <h3>Five Resources</h3>
             <p>
-              This reference combines three thematic handbooks originally
+              This reference combines three thematic handbooks and two lexicon datasets originally
               published by the <strong>United Bible Societies</strong> to
-              assist Bible translators. Together they cover the living
-              creatures, plant life, and human-made objects found throughout
-              Scripture.
+              assist Bible translators. Together they cover fauna, flora,
+              realia, and original-language dictionary entries in
+              <strong>Greek</strong> and <strong>Hebrew</strong>.
             </p>
           </div>
           <div class="about-card">
             <div class="about-icon">🔤</div>
             <h3>Original Languages</h3>
             <p>
-              Each entry includes the original <strong>Hebrew</strong>,
-              <strong>Aramaic</strong>, <strong>Greek</strong>, and
-              <strong>Latin</strong> terms with transliterations and every
-              Bible verse where the term appears.
+              The app includes dedicated <strong>Greek</strong> and
+              <strong>Hebrew</strong> lexicon tabs with transliterations,
+              semantic domains, scripture links, and cross-entry navigation,
+              alongside original-language terms in thematic entries.
             </p>
           </div>
           <div class="about-card">
@@ -115,6 +105,12 @@
             <li>
               <strong>Human-made Things in the Bible</strong> — Ray Pritz
               © 2009
+            </li>
+            <li>
+              <strong>UBS Greek New Testament Dictionary</strong> — UBS Open License
+            </li>
+            <li>
+              <strong>UBS Hebrew Old Testament Dictionary</strong> — UBS Open License
             </li>
           </ul>
           <p class="source-note">

@@ -113,8 +113,8 @@ img { max-width: 100%; display: block; }
 /* Hero */
 .landing-hero {
   min-height: 80vh;
-  display: flex; align-items: center; justify-content: center;
-  padding: 40px 20px;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 20px 72px;
   background:
     radial-gradient(ellipse at 20% 50%, rgba(123,79,42,0.04) 0%, transparent 60%),
     radial-gradient(ellipse at 80% 30%, rgba(42,93,143,0.03) 0%, transparent 50%);
@@ -131,9 +131,10 @@ img { max-width: 100%; display: block; }
   font-family: var(--f-serif);
   font-size: clamp(2.4rem, 6vw, 4rem);
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.2;
   color: var(--c-text);
   margin-bottom: 16px;
+  padding-top: 0.08em;
 }
 .hero-subtitle {
   display: block;
@@ -154,7 +155,7 @@ img { max-width: 100%; display: block; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
-  margin-bottom: 32px;
+  margin-bottom: 16px;
 }
 .hero-card {
   display: flex; flex-direction: column; align-items: center;
@@ -175,6 +176,38 @@ img { max-width: 100%; display: block; }
 .hero-card[data-book="flora"]:hover { border-color: var(--c-flora); }
 .hero-card[data-book="realia"]:hover { border-color: var(--c-realia); }
 
+.hero-lexicons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.hero-lexicons-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-text-muted);
+}
+.hero-lex-btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-text-secondary);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: all var(--t-fast);
+}
+.hero-lex-btn:hover {
+  border-color: var(--c-accent-light);
+  background: var(--c-accent-bg);
+  color: var(--c-accent);
+}
+
 .card-icon { font-size: 2rem; }
 .card-title { font-weight: 700; font-size: 1.1rem; }
 .card-desc { font-size: 0.85rem; color: var(--c-text-secondary); }
@@ -186,8 +219,36 @@ img { max-width: 100%; display: block; }
   padding: 12px 32px;
   border-radius: var(--r-full);
   transition: all var(--t-fast);
+  margin-bottom: 8px;
 }
 .hero-browse-all:hover { background: var(--c-accent-hover); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+
+.hero-book-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.hero-book-btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all var(--t-fast);
+}
+
+.hero-book-btn:hover {
+  border-color: var(--c-accent-light);
+  background: var(--c-accent-bg);
+  color: var(--c-accent);
+}
 
 /* About section */
 .landing-about {

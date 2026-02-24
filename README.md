@@ -12,15 +12,17 @@ An interactive, mobile-first web application for exploring **animals**, **plants
 
 ## Overview
 
-This project makes three scholarly handbooks — originally published by the **United Bible Societies** for Bible translators — freely accessible through a modern, searchable web interface:
+This project makes three scholarly handbooks and two lexical dictionaries — published by the **United Bible Societies** for Bible translators — freely accessible through a modern, searchable web interface:
 
 | Book | Entries | Source Work | Author |
 |------|--------:|-------------|--------|
 | **Fauna** | 114 | *All Creatures Great and Small: Living Things in the Bible* | Edward R. Hope (© 2005) |
 | **Flora** | 141 | *Each According to its Kind: Plants and Trees in the Bible* | Robert Koops (© 2012) |
 | **Realia** | 507 | *The Works of Their Hands: Man-made Things in the Bible* | Ray Pritz (© 2009) |
+| **Greek** | 5507 | *UBS Greek New Testament Dictionary* | UBS Open License |
+| **Hebrew** | 7223 | *UBS Hebrew Old Testament Dictionary* | UBS Open License |
 
-**762 entries** covering the natural and cultural world of Scripture, complete with:
+**13,492 entries** covering the natural/cultural world of Scripture plus lexical dictionaries, complete with:
 
 - Original **Hebrew**, **Aramaic**, **Greek**, and **Latin** terms
 - Transliterations and linguistic analysis
@@ -33,12 +35,15 @@ This project makes three scholarly handbooks — originally published by the **U
 ## Features
 
 - **Three-panel layout** — Entry navigator (left), article content (middle), references & language info (right)
-- **Full-text search** — Instant search across all three books with highlighted results
-- **Cross-reference navigation** — Click any cross-reference to jump directly to the linked entry
+- **Full-text search** — Instant search across all five books with highlighted results
+- **Lexicon tabs** — Dedicated Greek/Hebrew dictionary browsing with sort/group modes
+- **Cross-reference modal preview** — Click inline links to preview entries in a resizable, scrollable modal
+- **Cross-reference navigation** — Open linked entries from modal or inline links
 - **Mobile-first responsive design** — Collapsible panels with bottom navigation on small screens
-- **Keyboard shortcuts** — `/` to search, `Alt+↑/↓` to navigate entries, `Esc` to close panels
+- **Keyboard shortcuts** — `/` search, `Alt+↑/↓` entry navigation, `Alt+←` previous entry, `Esc` close overlays
 - **URL hash routing** — Shareable deep links to any entry (e.g., `#fauna/2.13`)
 - **Optional Strong’s enrichment** — Attach Strong’s IDs to lemmas and open them directly in BibleHub
+- **Inline scripture/chapter decoding** — `{S:...}` references render as clickable scripture chips
 - **Zero dependencies** — Pure HTML, CSS, and vanilla JavaScript; no frameworks or build tools needed at runtime
 - **Offline-capable** — Fully static; works from the local filesystem or any web server
 
@@ -51,7 +56,12 @@ flora-fauna-realia/
 ├── index.html      # Single-page application (landing + dictionary browser)
 ├── styles.css      # Mobile-first responsive styles
 ├── app.js          # Application logic (search, navigation, rendering)
-├── data.js         # Auto-generated dictionary data (all 762 entries)
+├── data-fauna.js   # Auto-generated thematic fauna entries
+├── data-flora.js   # Auto-generated thematic flora entries
+├── data-realia.js  # Auto-generated thematic realia entries
+├── data-greek.js   # Auto-generated Greek lexicon entries
+├── data-hebrew.js  # Auto-generated Hebrew lexicon entries
+├── data-index.js   # Lightweight index metadata
 └── README.md
 ```
 
@@ -84,7 +94,7 @@ python -m http.server 8899
 # Then visit http://localhost:8899
 ```
 
-### Rebuilding data.js from XML
+### Rebuilding data files from XML
 
 Requires **Python 3.9+** and the UBS XML source files.
 
@@ -93,7 +103,7 @@ cd ubs-open-license/flora-fauna-realia/XML
 python build_site.py
 ```
 
-This parses all three XML files and writes `data.js` to the app directory. 
+This parses thematic + lexical XML files and writes split `data-*.js` files to the app directory.
 
 If `strongs_map.json` exists, Strong’s IDs are embedded per language set and shown in the right sidebar as external links.
 
@@ -128,10 +138,11 @@ Notes:
 Parsing FAUNA_en.xml...  → 114 entries
 Parsing FLORA_en.xml...  → 141 entries
 Parsing REALIA_en.xml... → 507 entries
+Parsing UBSGreekNTDic-v1.0-en.XML...  → 5507 entries
+Parsing UBSHebrewDic-v0.9.1-en.XML... → 7223 entries
 
-✓ Generated data.js
-  Total entries: 762
-  File size: 3.4 MB
+✓ Generated data-fauna.js, data-flora.js, data-realia.js, data-greek.js, data-hebrew.js, data-index.js
+  Total entries: 13492
 
 ---
 
@@ -143,6 +154,7 @@ Parsing REALIA_en.xml... → 507 entries
 | `Esc` | Close search results or side panels |
 | `Alt + ↑` | Previous entry |
 | `Alt + ↓` | Next entry |
+| `Alt + ←` | Go back to previous selected entry |
 
 ---
 
